@@ -13,13 +13,14 @@ namespace TSUT.HeatManagement
 
         public void UpdateLightsPosition()
         {
+            var toRemove = new List<IMyCubeBlock>();
             foreach (var kvp in _lights)
             {
                 var block = kvp.Key;
                 if (block == null || block.MarkedForClose)
                 {
                     kvp.Value.Clear();
-                    _lights.Remove(block);
+                    toRemove.Add(block);
                     continue;
                 }
 
@@ -27,6 +28,8 @@ namespace TSUT.HeatManagement
                 kvp.Value.Position = block.GetPosition() + block.WorldMatrix.Up * 0.2f;
                 kvp.Value.UpdateLight();
             }
+            foreach (var block in toRemove)
+                _lights.Remove(block);
         }
 
         // Call once per tick for each battery with current heat
