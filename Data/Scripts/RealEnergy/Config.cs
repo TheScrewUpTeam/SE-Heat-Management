@@ -1,13 +1,66 @@
+using Sandbox.ModAPI;
+using System;
+
 namespace TSUT.HeatManagement
 {
-    public static class Config
+    public class Config
     {
-        public static float HEAT_COOLDOWN_COEFF = 20f; // tunable
-        public static float DISCHARGE_HEAT_FRACTION = 0.20f; // 20% of power becomes heat
-        public static float THERMAL_CONDUCTIVITY = 200f; // Arbitrary scaling factor for transfer rate
-        public static float VENT_COOLING_RATE = 1000f; // in Watts or J/s, tune as needed
-        public static float THRUSTER_COOLING_RATE = 25000f; // in Watts or J/s, tune as needed
-        public static float CRITICAL_TEMP = 150f; // Critical temperature for battery
-        public static float SMOKE_TRESHOLD = CRITICAL_TEMP * 0.9f; // Temperature at which smoke is emitted
+        public float HEAT_COOLDOWN_COEFF { get; set; } = 20f;
+        public float DISCHARGE_HEAT_FRACTION { get; set; } = 0.20f;
+        public float THERMAL_CONDUCTIVITY { get; set; } = 200f;
+        public float VENT_COOLING_RATE { get; set; } = 1000f;
+        public float THRUSTER_COOLING_RATE { get; set; } = 25000f;
+        public float CRITICAL_TEMP { get; set; } = 150f;
+        public float SMOKE_TRESHOLD => CRITICAL_TEMP * 0.9f;
+
+        private static Config _instance;
+        private const string CONFIG_FILE = "TSUT_HeatManagement_Config.xml";
+
+        public static Config Instance
+        {
+            get
+            {
+                if (_instance == null)
+                    _instance = Load();
+                return _instance;
+            }
+        }
+
+        public static Config Load()
+        {
+            Config config = new Config();
+            if (MyAPIGateway.Utilities.FileExistsInWorldStorage(CONFIG_FILE, typeof(Config)))
+            {
+                try
+                {
+                    string contents;
+                    using (var reader = MyAPIGateway.Utilities.ReadFileInWorldStorage(CONFIG_FILE, typeof(Config)))
+                    {
+                        contents = reader.ReadToEnd();
+                    }
+                    config = MyAPIGateway.Utilities.SerializeFromXML<Config>(contents);
+                }
+                catch (Exception e)
+                {
+                    MyAPIGateway.Utilities.ShowMessage("HeatManagement", $"Failed to load config, using defaults. {e.Message}");
+                }
+            }
+            return config;
+        }
+
+        public void Save()
+        {
+            try
+            {
+                using (var writer = MyAPIGateway.Utilities.WriteFileInWorldStorage(CONFIG_FILE, typeof(Config)))
+                {
+                    writer.Write(MyAPIGateway.Utilities.SerializeToXML(this));
+                }
+            }
+            catch (Exception e)
+            {
+                MyAPIGateway.Utilities.ShowMessage("HeatManagement", $"Failed to save config: {e.Message}");
+            }
+        }
     }
 }

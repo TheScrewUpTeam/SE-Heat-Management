@@ -55,10 +55,10 @@ namespace TSUT.HeatManagement
             float thermalCapacity = HeatSession.Api.Utils.GetThermalCapacity(battery);
             float outputMW = battery.CurrentOutput + battery.CurrentInput; // Total power output in MW
 
-            float tNorm = MathHelper.Clamp(HeatSession.Api.Utils.GetHeat(battery) / Config.CRITICAL_TEMP, 0f, 1f);
+            float tNorm = MathHelper.Clamp(HeatSession.Api.Utils.GetHeat(battery) / Config.Instance.CRITICAL_TEMP, 0f, 1f);
             float resistanceMultiplier = MathHelper.Lerp(1f, 2f, tNorm * tNorm); // More exponential rise
 
-            float internalResistance = Config.DISCHARGE_HEAT_FRACTION * resistanceMultiplier;
+            float internalResistance = Config.Instance.DISCHARGE_HEAT_FRACTION * resistanceMultiplier;
 
             float heatEnergy = outputMW * 1000000f * deltaTime * internalResistance; // MW to Watts (J/s) * seconds = Joules
             float heatGain = heatEnergy / thermalCapacity; // J / (J/°C) = °C
@@ -77,7 +77,7 @@ namespace TSUT.HeatManagement
             float ambientTemp = HeatSession.Api.Utils.CalculateAmbientTemperature(battery);
 
             // Energy loss due to ambient temperature difference
-            float energyLoss = (currentHeat - ambientTemp) * surfaceArea * Config.HEAT_COOLDOWN_COEFF * deltaTime;
+            float energyLoss = (currentHeat - ambientTemp) * surfaceArea * Config.Instance.HEAT_COOLDOWN_COEFF * deltaTime;
             return energyLoss / thermalCapacity; // °C lost
         }
 
@@ -128,7 +128,7 @@ namespace TSUT.HeatManagement
             info.AppendLine($"Density: {HeatSession.Api.Utils.GetDensity(block):F1} kg/m³");
             if (heatChange > 0f)
             {
-                float tempDiff = Config.CRITICAL_TEMP - heat;
+                float tempDiff = Config.Instance.CRITICAL_TEMP - heat;
                 float timeToOverheat = tempDiff / heatChange;
                 TimeSpan timeSpan = TimeSpan.FromSeconds(timeToOverheat);
                 string formattedTime = timeSpan.ToString(@"hh\:mm\:ss");
@@ -185,7 +185,7 @@ namespace TSUT.HeatManagement
 
             float tempDiff = tempA - tempB;
             float contactArea = HeatSession.Api.Utils.GetLargestFaceArea(neighborSlim);
-            float energyTransferred = tempDiff * Config.THERMAL_CONDUCTIVITY * contactArea * deltaTime; // Arbitrary scaling factor for transfer rate
+            float energyTransferred = tempDiff * Config.Instance.THERMAL_CONDUCTIVITY * contactArea * deltaTime; // Arbitrary scaling factor for transfer rate
 
             // Convert energy to delta-T for each block
             float deltaA = -energyTransferred / capacityA;
@@ -221,7 +221,7 @@ namespace TSUT.HeatManagement
                 float tempDiff = tempA - tempB;
 
                 float contactArea = HeatSession.Api.Utils.GetLargestFaceArea(neighborSlim);
-                float energyTransferred = tempDiff * Config.THERMAL_CONDUCTIVITY * contactArea * deltaTime; // Arbitrary scaling factor for transfer rate
+                float energyTransferred = tempDiff * Config.Instance.THERMAL_CONDUCTIVITY * contactArea * deltaTime; // Arbitrary scaling factor for transfer rate
 
                 // Convert energy to delta-T for each block
                 float deltaA = -energyTransferred / capacityA;
@@ -252,7 +252,7 @@ namespace TSUT.HeatManagement
         {
             HeatSession.Api.Effects.UpdateBlockHeatLight(_battery, heat);
             // Check if we need to instantiate or remove smoke effects
-            if (heat > Config.SMOKE_TRESHOLD)
+            if (heat > Config.Instance.SMOKE_TRESHOLD)
             {
                 HeatSession.Api.Effects.InstantiateSmoke(_battery);
             }
@@ -261,7 +261,7 @@ namespace TSUT.HeatManagement
                 HeatSession.Api.Effects.RemoveSmoke(_battery);
             }
             // Check if we need to explode the battery
-            if (heat > Config.CRITICAL_TEMP)
+            if (heat > Config.Instance.CRITICAL_TEMP)
             {
                 ExplodeBatteryInstantly(_battery);
             }

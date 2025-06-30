@@ -322,7 +322,7 @@ namespace TSUT.HeatManagement
             var thermalCapacity = GetThermalCapacity(block);
             var surfaceArea = GetRealSurfaceArea(block);
 
-            float energyLoss = (currentHeat - ambientTemp) * surfaceArea * Config.HEAT_COOLDOWN_COEFF * deltaTime;
+            float energyLoss = (currentHeat - ambientTemp) * surfaceArea * Config.Instance.HEAT_COOLDOWN_COEFF * deltaTime;
             float heatLoss = energyLoss / thermalCapacity; // °C lost
 
             return heatLoss;
@@ -332,7 +332,7 @@ namespace TSUT.HeatManagement
             float currentTemp = GetHeat(vent);
             float ambientTemp = CalculateAmbientTemperature(vent) - 2f; // 2 degrees lower than ambient to simulate cooling effect
             float airDensity = vent.GetOxygenLevel();
-            float coolingPower = Config.VENT_COOLING_RATE * airDensity;
+            float coolingPower = Config.Instance.VENT_COOLING_RATE * airDensity;
 
             float tempDiff = currentTemp - ambientTemp;
 
@@ -343,7 +343,7 @@ namespace TSUT.HeatManagement
 
         public float GetActiveThrusterHeatLoss(IMyThrust thruster, float thrustRatio, float deltaTime)
         {
-            float baseCoolingRate = Config.THRUSTER_COOLING_RATE; // Tunable parameter
+            float baseCoolingRate = Config.Instance.THRUSTER_COOLING_RATE; // Tunable parameter
             float effectiveness = MathHelper.Clamp(thrustRatio, 0f, 1f);
 
             float ambientTemp = CalculateAmbientTemperature(thruster) - 2f; // 2 degrees lower than ambient to simulate cooling effect
