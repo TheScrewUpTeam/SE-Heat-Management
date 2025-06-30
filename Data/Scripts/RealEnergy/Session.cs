@@ -30,10 +30,18 @@ namespace TSUT.HeatManagement
         private int _lastNeighborsUpdateTick = 0;
         private int _lastMainUpdateTick = 0;
 
+        public static Config Config;
+
         public override void LoadData()
         {
             if (!MyAPIGateway.Multiplayer.IsServer)
                 return;
+
+            // Load config (will use defaults if file doesn't exist)
+            Config = Config.Instance;
+
+            // Try load config
+            Config.Load();
 
             _heatApi.Registry.RegisterHeatBehaviorFactory(new BatteryHeatManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new VentHeatManagerFactory());
@@ -116,5 +124,13 @@ namespace TSUT.HeatManagement
         //     IMyPlayer me = MyAPIGateway.Session?.Player;
         //     float temp = HeatUtils.GetTemperatureForPlayer(me.GetPosition());
         // }
+
+        public override void SaveData()
+        {
+            if (MyAPIGateway.Multiplayer.IsServer)
+            {
+                Config.Save();
+            }
+        }
     }
 }
