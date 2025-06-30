@@ -22,7 +22,6 @@ This mod brings a whole new layer of engineering challenge to your grids: **HEAT
 - **Realistic(ish) heat transfer** between blocks and the environment.
 - **Visual feedback:** Glowing lights and smoke effects for hot blocks.
 - **Per-save config file:** Tweak the mod's behavior for each world.
-- **No more magic numbers!** (Well, almost. We're working on it.)
 - **Exploding batteries** if you ignore the laws of thermodynamics.  
 - **Fun for engineers, masochists, and anyone who thinks vanilla is too easy.**
 
