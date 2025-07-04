@@ -156,7 +156,7 @@ namespace TSUT.HeatManagement
                     var neighborBlock = neighbor.FatBlock;
                     if (neighborBlock != null)
                     {
-                        info.AppendLine($"- {neighborBlock.DisplayNameText} ({HeatSession.Api.Utils.GetHeat(neighborBlock):F2}°C) -> {neighborWithChange[neighbor]:F2} °C/s");
+                        info.AppendLine($"- {neighborBlock.DisplayNameText} ({HeatSession.Api.Utils.GetHeat(neighborBlock):F2}°C) -> {neighborWithChange[neighbor]:F4} °C/s");
                     }
                 }
             }
@@ -181,18 +181,12 @@ namespace TSUT.HeatManagement
             float tempA = HeatSession.Api.Utils.GetHeat(_battery);
             float tempB = HeatSession.Api.Utils.GetHeat(neighborFat);
             float capacityA = HeatSession.Api.Utils.GetThermalCapacity(_battery);
-            float capacityB = HeatSession.Api.Utils.GetThermalCapacity(neighborFat);
 
             float tempDiff = tempA - tempB;
             float contactArea = HeatSession.Api.Utils.GetLargestFaceArea(neighborSlim);
             float energyTransferred = tempDiff * Config.Instance.THERMAL_CONDUCTIVITY * contactArea * deltaTime; // Arbitrary scaling factor for transfer rate
 
-            // Convert energy to delta-T for each block
             float deltaA = -energyTransferred / capacityA;
-            float deltaB = energyTransferred / capacityB;
-
-            HeatSession.Api.Utils.SetHeat(_battery, tempA + deltaA);
-            HeatSession.Api.Utils.SetHeat(neighborFat, tempB + deltaB);
 
             return deltaA;
         }
@@ -241,7 +235,7 @@ namespace TSUT.HeatManagement
 
                 if (_battery.CustomName.Contains("ShowHeat"))
                 {
-                    MyAPIGateway.Utilities.ShowNotification($"Neighbor: {neighborFat.DisplayNameText}, before: {tempB}, exp: {tempB + deltaB}, after: {HeatSession.Api.Utils.GetHeat(neighborFat)}", 1000);
+                    MyAPIGateway.Utilities.ShowNotification($"Neighbor: {neighborFat.DisplayNameText}, before: {tempB}, change: {deltaB}, after: {HeatSession.Api.Utils.GetHeat(neighborFat)}", 1000);
                 }
 
                 cumulativeHeat += deltaA;
