@@ -58,6 +58,8 @@ namespace TSUT.HeatManagement
             builder.AppendLine($"Thermal Capacity: {capacity / 1000000:F1} MJ/°C");
             builder.AppendLine($"Thrust output: {outputRatio * 100:F1} %");
             builder.AppendLine($"Ambient temp: {ambient:F1} °C");
+            float windSpeed = HeatSession.Api.Utils.GetBlockWindSpeed(block);
+            builder.AppendLine($"Wind Speed: {windSpeed:F2} m/s");
             builder.AppendLine($"------");
         }
 

@@ -75,9 +75,11 @@ namespace TSUT.HeatManagement
             float surfaceArea = HeatSession.Api.Utils.GetRealSurfaceArea(battery);
             float currentHeat = HeatSession.Api.Utils.GetHeat(battery);
             float ambientTemp = HeatSession.Api.Utils.CalculateAmbientTemperature(battery);
-
-            // Energy loss due to ambient temperature difference
-            float energyLoss = (currentHeat - ambientTemp) * surfaceArea * Config.Instance.HEAT_COOLDOWN_COEFF * deltaTime;
+            float windSpeed = HeatSession.Api.Utils.GetBlockWindSpeed(battery);
+            float windMultiplier = 1f + Config.Instance.WIND_COOLING_MULT * windSpeed;
+            
+            // Energy loss due to ambient temperature difference, increased by wind
+            float energyLoss = (currentHeat - ambientTemp) * surfaceArea * Config.Instance.HEAT_COOLDOWN_COEFF * windMultiplier * deltaTime;
             return energyLoss / thermalCapacity; // °C lost
         }
 
@@ -126,6 +128,8 @@ namespace TSUT.HeatManagement
             info.AppendLine($"Thermal Capacity: {HeatSession.Api.Utils.GetThermalCapacity(block) / 1000000:F1} MJ/°C");
             info.AppendLine($"Cooling Area: {HeatSession.Api.Utils.GetRealSurfaceArea(block):F1} m²");
             info.AppendLine($"Density: {HeatSession.Api.Utils.GetDensity(block):F1} kg/m³");
+            float windSpeed = HeatSession.Api.Utils.GetBlockWindSpeed(block);
+            info.AppendLine($"Wind Speed: {windSpeed:F2} m/s");
             if (heatChange > 0f)
             {
                 float tempDiff = Config.Instance.CRITICAL_TEMP - heat;

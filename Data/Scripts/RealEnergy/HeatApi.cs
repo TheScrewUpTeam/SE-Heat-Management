@@ -47,6 +47,7 @@ namespace TSUT.HeatManagement
         void PurgeCaches();
         void SetHeat(IMyCubeBlock block, float heat);
         float ApplyHeatChange(IMyCubeBlock block, float heatChange);
+        float GetBlockWindSpeed(IMyCubeBlock block);
     }
 
     public interface IHeatEffects

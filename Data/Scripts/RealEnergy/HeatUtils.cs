@@ -205,6 +205,29 @@ namespace TSUT.HeatManagement
             return GetTemperatureOnPlanet(position);
         }
 
+        public float GetWindSpeed(Vector3D position)
+        {
+            var planet = MyGamePruningStructure.GetClosestPlanet(position);
+            if (planet == null)
+                return 0f;
+            return planet.GetWindSpeed(position);
+        }
+
+        public float GetGridSpeed(IMyCubeBlock block)
+        {
+            var grid = block.CubeGrid as MyCubeGrid;
+            if (grid == null || grid.Physics == null)
+                return 0f;
+
+            // Return the magnitude of the grid's linear velocity (in m/s)
+            return (float)grid.Physics.LinearVelocity.Length();
+        }
+
+        public float GetBlockWindSpeed(IMyCubeBlock block)
+        {
+            return GetWindSpeed(block.GetPosition()) + GetGridSpeed(block);
+        }
+
         public float GetTemperatureOnPlanet(Vector3D position)
         {
             float ambientTemp = -180f; // Ambient space temperature
