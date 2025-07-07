@@ -4,6 +4,7 @@ using Sandbox.ModAPI;
 using VRage.Game;
 using VRage.Game.ModAPI;
 using VRage.Utils;
+using SpaceEngineers.Game.ModAPI;
 
 namespace TSUT.HeatManagement
 {
