@@ -32,8 +32,13 @@ namespace TSUT.HeatManagement
 
         public static Config Config;
 
+        private static HeatSession _instance;
+
+        private HashSet<IMyCubeGrid> _ownershipSubscribedGrids = new HashSet<IMyCubeGrid>();
+
         public override void LoadData()
         {
+            _instance = this;
             if (!MyAPIGateway.Multiplayer.IsServer)
                 return;
 
@@ -46,8 +51,6 @@ namespace TSUT.HeatManagement
             _heatApi.Registry.RegisterHeatBehaviorFactory(new BatteryHeatManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new VentHeatManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new ThrusterHeatManagerFactory());
-
-            //MyAPIGateway.Utilities.SendModMessage(ApiModId, _heatApi);
         }
 
         public override void BeforeStart()
@@ -70,15 +73,30 @@ namespace TSUT.HeatManagement
         {
             var grid = entity as IMyCubeGrid;
             if (grid == null) return;
-
-            _gridHeatManagers[grid].Cleanup();
-            _gridHeatManagers.Remove(grid);
+            GridHeatManager manager;
+            if (_gridHeatManagers.TryGetValue(grid, out manager))
+            {
+                manager.Cleanup();
+                _gridHeatManagers.Remove(grid);
+            }
         }
 
         private void OnEntityAdd(IMyEntity entity)
         {
             var grid = entity as IMyCubeGrid;
             if (grid == null) return;
+
+            // Always subscribe to ownership changes for all terminal blocks
+            if (!_ownershipSubscribedGrids.Contains(grid))
+            {
+                var terminalBlocks = new List<IMyTerminalBlock>();
+                MyAPIGateway.TerminalActionsHelper.GetTerminalSystemForGrid(grid).GetBlocksOfType(terminalBlocks);
+                foreach (var block in terminalBlocks)
+                {
+                    block.OwnershipChanged += OnAnyBlockOwnershipChanged;
+                }
+                _ownershipSubscribedGrids.Add(grid);
+            }
 
             // If config is set, only add grids owned by the local player
             if (Config != null && Config.LIMIT_TO_PLAYER_GRIDS)
@@ -92,6 +110,11 @@ namespace TSUT.HeatManagement
             }
 
             _gridHeatManagers[grid] = new GridHeatManager(grid);
+        }
+
+        private void OnAnyBlockOwnershipChanged(IMyTerminalBlock block)
+        {
+            OnGridOwnershipChanged(block.CubeGrid);
         }
 
         public override void UpdateBeforeSimulation()
@@ -141,6 +164,26 @@ namespace TSUT.HeatManagement
             if (MyAPIGateway.Multiplayer.IsServer)
             {
                 Config.Save();
+            }
+        }
+
+        public static void OnGridOwnershipChanged(IMyCubeGrid grid)
+        {
+            if (Config != null && Config.LIMIT_TO_PLAYER_GRIDS)
+            {
+                var bigOwners = grid.BigOwners;
+                long myId = MyAPIGateway.Session?.Player?.IdentityId ?? 0;
+                bool shouldHave = (bigOwners != null && bigOwners.Contains(myId));
+                bool has = _instance._gridHeatManagers.ContainsKey(grid);
+                if (shouldHave && !has)
+                {
+                    _instance._gridHeatManagers[grid] = new GridHeatManager(grid);
+                }
+                else if (!shouldHave && has)
+                {
+                    _instance._gridHeatManagers[grid].Cleanup();
+                    _instance._gridHeatManagers.Remove(grid);
+                }
             }
         }
     }
