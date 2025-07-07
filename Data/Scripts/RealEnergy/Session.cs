@@ -46,6 +46,7 @@ namespace TSUT.HeatManagement
             _heatApi.Registry.RegisterHeatBehaviorFactory(new BatteryHeatManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new VentHeatManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new ThrusterHeatManagerFactory());
+            _heatApi.Registry.RegisterHeatBehaviorFactory(new HeatPipeManagerFactory());
 
             //MyAPIGateway.Utilities.SendModMessage(ApiModId, _heatApi);
         }

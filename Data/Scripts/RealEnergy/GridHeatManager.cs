@@ -78,9 +78,15 @@ namespace TSUT.HeatManagement
 
         public void UpdateBlocksTemp(float deltaTime)
         {
+            HashSet<IHeatBehavior> called = new HashSet<IHeatBehavior>();
+
             // Update heat for each block
             foreach (var kvp in new Dictionary<IMyCubeBlock, IHeatBehavior>(_heatBehaviors))
             {
+                if (called.Contains(kvp.Value))
+                    continue;
+                called.Add(kvp.Value);  
+
                 IMyCubeBlock block = kvp.Key;
                 IHeatBehavior behavior = kvp.Value;
                 try
@@ -101,9 +107,15 @@ namespace TSUT.HeatManagement
 
         public void UpdateNeighborsTemp(float deltaTime)
         {
+            HashSet<IHeatBehavior> called = new HashSet<IHeatBehavior>();
+
             // Spread heat between neighbors
             foreach (var kvp in _heatBehaviors)
             {
+                if (called.Contains(kvp.Value))
+                    continue;
+                called.Add(kvp.Value);
+
                 IHeatBehavior behavior = kvp.Value;
                 try
                 {
