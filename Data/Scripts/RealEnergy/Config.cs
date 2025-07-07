@@ -13,6 +13,7 @@ namespace TSUT.HeatManagement
         public float CRITICAL_TEMP { get; set; } = 150f;
         public float SMOKE_TRESHOLD => CRITICAL_TEMP * 0.9f;
         public float WIND_COOLING_MULT { get; set; } = 0.1f;
+        public bool LIMIT_TO_PLAYER_GRIDS { get; set; } = false;
 
         private static Config _instance;
         private const string CONFIG_FILE = "TSUT_HeatManagement_Config.xml";

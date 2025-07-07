@@ -78,7 +78,18 @@ namespace TSUT.HeatManagement
         private void OnEntityAdd(IMyEntity entity)
         {
             var grid = entity as IMyCubeGrid;
-                if (grid == null) return;
+            if (grid == null) return;
+
+            // If config is set, only add grids owned by the local player
+            if (Config != null && Config.LIMIT_TO_PLAYER_GRIDS)
+            {
+                var bigOwners = grid.BigOwners;
+                if (bigOwners == null || bigOwners.Count == 0)
+                    return;
+                long myId = MyAPIGateway.Session?.Player?.IdentityId ?? 0;
+                if (!bigOwners.Contains(myId))
+                    return;
+            }
 
             _gridHeatManagers[grid] = new GridHeatManager(grid);
         }
