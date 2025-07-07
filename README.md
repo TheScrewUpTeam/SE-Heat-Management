@@ -41,6 +41,7 @@ This mod brings a whole new layer of engineering challenge to your grids: **HEAT
 
 - The config file is saved as `TSUT_HeatManagement_Config.xml` in your world's Storage folder.
 - You can change heat coefficients, critical temperatures, and more.
+- **New:** `LIMIT_TO_PLAYER_GRIDS` (true/false) — If true, the mod will only apply heat simulation to grids owned by the local player. The mod will now automatically enable or disable heat management for grids as you take or lose ownership, without requiring a reload.
 - The mod will always use the config from your current save, so each world can have its own heat rules.
 
 ---
