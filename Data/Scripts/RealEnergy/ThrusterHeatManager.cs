@@ -74,8 +74,6 @@ namespace TSUT.HeatManagement
             if (_thruster.IsFunctional && _thruster.Enabled && thrustRatio > 0f)
             {
                 change = HeatSession.Api.Utils.GetActiveThrusterHeatLoss(_thruster, thrustRatio, deltaTime);
-                if (_thruster.DisplayNameText.Contains("HeatDebug"))
-                    MyAPIGateway.Utilities.ShowNotification($"Thruster: {_thruster.DisplayNameText}, thrustRatio: {thrustRatio}, change: {change}", 1000);
             }
             return -change;
         }
@@ -96,6 +94,7 @@ namespace TSUT.HeatManagement
 
         public void ReactOnNewHeat(float heat)
         {
+            this._thruster.RefreshCustomInfo();
             return; // No specific reaction needed for thrusters
         }
     }

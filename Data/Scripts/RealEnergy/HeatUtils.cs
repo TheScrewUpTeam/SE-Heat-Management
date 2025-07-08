@@ -86,11 +86,8 @@ namespace TSUT.HeatManagement
                 block.Storage = new MyModStorageComponent();
             }
 
-            if (float.IsNaN(heat) || float.IsInfinity(heat))
-            {
-                // Invalid heat value, reset to ambient
+            if (float.IsNaN(heat) || float.IsInfinity(heat)){
                 MyAPIGateway.Utilities.ShowNotification($"Wrong heat value for {block.DisplayNameText}: {heat}", 1000);
-                return;
             }
             block.Storage[HeatKey] = heat.ToString();
         }

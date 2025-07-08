@@ -12,7 +12,7 @@ namespace TSUT.HeatManagement
     [MySessionComponentDescriptor(MyUpdateOrder.BeforeSimulation)]
     public class HeatSession : MySessionComponentBase
     {
-        private static readonly long ApiModId = 1234567890; // Replace with your actual mod ID
+        private static readonly long ApiModId = 3513670949; // Replace with your actual mod ID
 
         const int NEIGHBOT_UPDATE_INTERVAL = 100; // in ticks
         const int MAIN_UPDATE_INTERVAL = 30; // in ticks
@@ -32,13 +32,10 @@ namespace TSUT.HeatManagement
 
         public static Config Config;
 
-        private static HeatSession _instance;
-
         private HashSet<IMyCubeGrid> _ownershipSubscribedGrids = new HashSet<IMyCubeGrid>();
 
         public override void LoadData()
         {
-            _instance = this;
             if (!MyAPIGateway.Multiplayer.IsServer)
                 return;
 
@@ -148,17 +145,9 @@ namespace TSUT.HeatManagement
                         manager.UpdateNeighborsTemp(passedTime);
                     }
                     _lastNeighborsUpdateTick = _tickCount;
-
-                    //TestOutput();
                 }
             _tickCount++;
         }
-
-        // private void TestOutput()
-        // {
-        //     IMyPlayer me = MyAPIGateway.Session?.Player;
-        //     float temp = HeatUtils.GetTemperatureForPlayer(me.GetPosition());
-        // }
 
         public override void SaveData()
         {
@@ -168,22 +157,22 @@ namespace TSUT.HeatManagement
             }
         }
 
-        public static void OnGridOwnershipChanged(IMyCubeGrid grid)
+        public void OnGridOwnershipChanged(IMyCubeGrid grid)
         {
             if (Config != null && Config.LIMIT_TO_PLAYER_GRIDS)
             {
                 var bigOwners = grid.BigOwners;
                 long myId = MyAPIGateway.Session?.Player?.IdentityId ?? 0;
                 bool shouldHave = (bigOwners != null && bigOwners.Contains(myId));
-                bool has = _instance._gridHeatManagers.ContainsKey(grid);
+                bool has = _gridHeatManagers.ContainsKey(grid);
                 if (shouldHave && !has)
                 {
-                    _instance._gridHeatManagers[grid] = new GridHeatManager(grid);
+                    _gridHeatManagers[grid] = new GridHeatManager(grid);
                 }
                 else if (!shouldHave && has)
                 {
-                    _instance._gridHeatManagers[grid].Cleanup();
-                    _instance._gridHeatManagers.Remove(grid);
+                    _gridHeatManagers[grid].Cleanup();
+                    _gridHeatManagers.Remove(grid);
                 }
             }
         }

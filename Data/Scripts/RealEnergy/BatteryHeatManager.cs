@@ -237,17 +237,13 @@ namespace TSUT.HeatManagement
 
                 HeatSession.Api.Utils.SetHeat(neighborFat, tempB + deltaB - ambientLoss);
 
-                if (_battery.CustomName.Contains("ShowHeat"))
-                {
-                    MyAPIGateway.Utilities.ShowNotification($"Neighbor: {neighborFat.DisplayNameText}, before: {tempB}, change: {deltaB}, after: {HeatSession.Api.Utils.GetHeat(neighborFat)}", 1000);
-                }
-
                 cumulativeHeat += deltaA;
             }
         }
 
         public void ReactOnNewHeat(float heat)
         {
+            this._battery.RefreshCustomInfo();
             HeatSession.Api.Effects.UpdateBlockHeatLight(_battery, heat);
             // Check if we need to instantiate or remove smoke effects
             if (heat > Config.Instance.SMOKE_TRESHOLD)

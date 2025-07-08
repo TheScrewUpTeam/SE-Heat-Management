@@ -1,10 +1,7 @@
 using System;
 using System.Collections.Generic;
-using Sandbox.ModAPI;
-using VRage.Game;
 using VRage.Game.ModAPI;
 using VRage.Utils;
-using SpaceEngineers.Game.ModAPI;
 
 namespace TSUT.HeatManagement
 {
@@ -16,7 +13,6 @@ namespace TSUT.HeatManagement
 
         public GridHeatManager(IMyCubeGrid grid)
         {
-            // MyAPIGateway.Utilities.ShowNotification($"Factories to process: {HeatSession.Api.Registry.GetFactories().Count}", 5000);
             foreach (var factory in HeatSession.Api.Registry.GetFactories())
             {
                 if (factory == null)

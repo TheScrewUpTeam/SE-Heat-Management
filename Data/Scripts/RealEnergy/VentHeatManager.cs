@@ -89,6 +89,7 @@ namespace TSUT.HeatManagement
 
         public void ReactOnNewHeat(float heat)
         {
+            this._vent.RefreshCustomInfo();
             return; // Vents do not react to new heat in this implementation
         }
     }
