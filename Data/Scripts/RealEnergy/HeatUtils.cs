@@ -8,6 +8,7 @@ using Sandbox.Game.World;
 using Sandbox.ModAPI;
 using SpaceEngineers.Game.ModAPI;
 using VRage.Game.ModAPI;
+using VRage.Utils;
 using VRageMath;
 
 namespace TSUT.HeatManagement
@@ -63,7 +64,7 @@ namespace TSUT.HeatManagement
         {
             if (block.Storage == null)
             {
-                block.Storage = new MyModStorageComponent();
+                SetHeat(block, CalculateAmbientTemperature(block));
             }
             string heatStr;
             if (block.Storage.TryGetValue(HeatKey, out heatStr))
@@ -78,9 +79,8 @@ namespace TSUT.HeatManagement
             return fallbackAmbient;
         }
 
-        public void SetHeat(IMyCubeBlock block, float heat)
+        public void SetHeat(IMyCubeBlock block, float heat, bool silent = false)
         {
-
             if (block.Storage == null)
             {
                 block.Storage = new MyModStorageComponent();
@@ -90,6 +90,9 @@ namespace TSUT.HeatManagement
                 MyAPIGateway.Utilities.ShowNotification($"Wrong heat value for {block.DisplayNameText}: {heat}", 1000);
             }
             block.Storage[HeatKey] = heat.ToString();
+            if (!silent) {
+                SendHeatToClients(block, heat);
+            }
         }
 
         public float GetRealSurfaceArea(IMyCubeBlock battery)
@@ -380,6 +383,17 @@ namespace TSUT.HeatManagement
             float newHeat = currentHeat + heatChange;
             SetHeat(block, currentHeat + heatChange);
             return newHeat;
+        }
+
+        public void SendHeatToClients(IMyCubeBlock block, float heat)
+        {
+            var msg = new HeatSyncMessage
+            {
+                EntityId = block.EntityId,
+                Heat = heat
+            };
+
+            HeatSession.networking?.RelayToClients(msg);
         }
     }
 }

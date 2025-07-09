@@ -5,6 +5,9 @@ namespace TSUT.HeatManagement
 {
     public class Config
     {
+        public static ushort HeatSyncMessageId = 7949; // Choose any unused ushort value
+
+
         public float HEAT_COOLDOWN_COEFF { get; set; } = 20f;
         public float DISCHARGE_HEAT_FRACTION { get; set; } = 0.20f;
         public float THERMAL_CONDUCTIVITY { get; set; } = 200f;

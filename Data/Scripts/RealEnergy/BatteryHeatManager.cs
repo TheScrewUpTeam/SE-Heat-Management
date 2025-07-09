@@ -255,7 +255,7 @@ namespace TSUT.HeatManagement
                 HeatSession.Api.Effects.RemoveSmoke(_battery);
             }
             // Check if we need to explode the battery
-            if (heat > Config.Instance.CRITICAL_TEMP)
+            if (heat > Config.Instance.CRITICAL_TEMP && MyAPIGateway.Multiplayer.IsServer)
             {
                 ExplodeBatteryInstantly(_battery);
             }

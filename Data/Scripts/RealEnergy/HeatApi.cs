@@ -45,7 +45,7 @@ namespace TSUT.HeatManagement
         float GetThermalCapacity(IMyCubeBlock block);
         bool IsBlockInPressurizedRoom(IMyCubeBlock block);
         void PurgeCaches();
-        void SetHeat(IMyCubeBlock block, float heat);
+        void SetHeat(IMyCubeBlock block, float heat, bool silent = true);
         float ApplyHeatChange(IMyCubeBlock block, float heatChange);
         float GetBlockWindSpeed(IMyCubeBlock block);
     }

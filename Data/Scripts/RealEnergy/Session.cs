@@ -5,10 +5,14 @@ using VRage.ModAPI;
 using System.Collections.Generic;
 using VRage.Game;
 using VRage.Utils;
+using System;
+using VRage.Network;
+using VRage.GameServices;
+using SpaceEngineers.Game.ModAPI;
 
 namespace TSUT.HeatManagement
 {
-    
+
     [MySessionComponentDescriptor(MyUpdateOrder.BeforeSimulation)]
     public class HeatSession : MySessionComponentBase
     {
@@ -24,11 +28,15 @@ namespace TSUT.HeatManagement
             get { return _heatApi; }
         }
 
+        public static Networking networking = new Networking(Config.HeatSyncMessageId); 
+
         private Dictionary<IMyCubeGrid, GridHeatManager> _gridHeatManagers = new Dictionary<IMyCubeGrid, GridHeatManager>();
 
         private int _tickCount = 0;
         private int _lastNeighborsUpdateTick = 0;
         private int _lastMainUpdateTick = 0;
+
+        private static Dictionary<long, IHeatBehavior> _trackedNetworkBlocks = new Dictionary<long, IHeatBehavior>();
 
         public static Config Config;
 
@@ -37,7 +45,9 @@ namespace TSUT.HeatManagement
         public override void LoadData()
         {
             if (!MyAPIGateway.Multiplayer.IsServer)
+            {
                 return;
+            }
 
             // Load config (will use defaults if file doesn't exist)
             Config = Config.Instance;
@@ -50,8 +60,32 @@ namespace TSUT.HeatManagement
             _heatApi.Registry.RegisterHeatBehaviorFactory(new ThrusterHeatManagerFactory());
         }
 
+        protected override void UnloadData()
+        {
+            networking?.Unregister();
+        }
+
+        private void OnHeatMessageReceived(ushort channel, byte[] data, ulong senderSteamId, bool fromServer)
+        {
+            MyLog.Default.WriteLine($"[Network] Message received: ch {channel}, s: {senderSteamId}, serv: {fromServer}");
+            if (!fromServer) return; // extra safety: ignore client-sent data
+
+            var msg = MyAPIGateway.Utilities.SerializeFromBinary<HeatSyncMessage>(data);
+            IMyEntity ent;
+            if (MyAPIGateway.Entities.TryGetEntityById(msg.EntityId, out ent))
+            {
+                var block = ent as IMyCubeBlock;
+                if (block != null)
+                {
+                    // Do something with block + msg.Heat
+                    MyLog.Default.WriteLine($"[Heat] {block.DisplayNameText}: {msg.Heat} °C");
+                }
+            }
+        }
+
         public override void BeforeStart()
         {
+            networking.Register();
             MyLog.Default.WriteLine($"[HeatManagement] HeatAPI populated");
             MyAPIGateway.Utilities.SendModMessage(ApiModId, _heatApi);
 
@@ -96,17 +130,28 @@ namespace TSUT.HeatManagement
             }
 
             // If config is set, only add grids owned by the local player
-            if (Config != null && Config.LIMIT_TO_PLAYER_GRIDS)
-            {
-                var bigOwners = grid.BigOwners;
-                if (bigOwners == null || bigOwners.Count == 0)
-                    return;
-                long myId = MyAPIGateway.Session?.Player?.IdentityId ?? 0;
-                if (!bigOwners.Contains(myId))
-                    return;
-            }
+            if (Config != null && Config.LIMIT_TO_PLAYER_GRIDS && !IsPlayrGrid(grid))
+                return;
 
             _gridHeatManagers[grid] = new GridHeatManager(grid);
+        }
+
+        private static bool IsPlayrGrid(IMyCubeGrid grid)
+        {
+            var bigOwners = grid.BigOwners;
+            if (bigOwners == null || bigOwners.Count == 0)
+                return false;
+
+            foreach (var ownerId in bigOwners)
+            {
+                var identity = MyAPIGateway.Players.TryGetIdentityId(ownerId);
+                if (identity != null)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private void OnAnyBlockOwnershipChanged(IMyTerminalBlock block)
@@ -135,16 +180,16 @@ namespace TSUT.HeatManagement
             }
 
             if (_tickCount % NEIGHBOT_UPDATE_INTERVAL == 0)
-                {
-                    float passedTicks = _tickCount - _lastNeighborsUpdateTick;
-                    float passedTime = passedTicks * MyEngineConstants.UPDATE_STEP_SIZE_IN_SECONDS;
+            {
+                float passedTicks = _tickCount - _lastNeighborsUpdateTick;
+                float passedTime = passedTicks * MyEngineConstants.UPDATE_STEP_SIZE_IN_SECONDS;
 
-                    foreach (var manager in _gridHeatManagers.Values)
-                    {
-                        manager.UpdateNeighborsTemp(passedTime);
-                    }
-                    _lastNeighborsUpdateTick = _tickCount;
+                foreach (var manager in _gridHeatManagers.Values)
+                {
+                    manager.UpdateNeighborsTemp(passedTime);
                 }
+                _lastNeighborsUpdateTick = _tickCount;
+            }
             _tickCount++;
         }
 
@@ -160,9 +205,7 @@ namespace TSUT.HeatManagement
         {
             if (Config != null && Config.LIMIT_TO_PLAYER_GRIDS)
             {
-                var bigOwners = grid.BigOwners;
-                long myId = MyAPIGateway.Session?.Player?.IdentityId ?? 0;
-                bool shouldHave = (bigOwners != null && bigOwners.Contains(myId));
+                bool shouldHave = IsPlayrGrid(grid);
                 bool has = _gridHeatManagers.ContainsKey(grid);
                 if (shouldHave && !has)
                 {
@@ -172,6 +215,39 @@ namespace TSUT.HeatManagement
                 {
                     _gridHeatManagers[grid].Cleanup();
                     _gridHeatManagers.Remove(grid);
+                }
+            }
+        }
+
+        internal static void UpdateUI(long entityId, float heat)
+        {
+            IMyEntity ent;
+            if (MyAPIGateway.Entities.TryGetEntityById(entityId, out ent))
+            {
+                var block = ent as IMyCubeBlock;
+                if (block != null)
+                {
+                    _heatApi.Utils.SetHeat(block, heat, true);
+                    IHeatBehavior info;
+                    if (!_trackedNetworkBlocks.TryGetValue(entityId, out info)){
+                        if (block is IMyBatteryBlock) {
+                            var battery = block as IMyBatteryBlock;
+                            info = new BatteryHeatManager(battery);
+                            _trackedNetworkBlocks[entityId] = info;
+                        }
+                        if (block is IMyAirVent) {
+                            var vent = block as IMyAirVent;
+                            info = new VentHeatManager(vent);
+                            _trackedNetworkBlocks[entityId] = info;
+                        }
+                        if (block is IMyThrust) {
+                            var thrust = block as IMyThrust;
+                            info = new ThrusterHeatManager(thrust);
+                            _trackedNetworkBlocks[entityId] = info;
+                        }
+                    } else {
+                        info.ReactOnNewHeat(heat);
+                    }
                 }
             }
         }
