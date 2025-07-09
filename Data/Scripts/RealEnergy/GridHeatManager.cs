@@ -2,14 +2,16 @@ using System;
 using System.Collections.Generic;
 using VRage.Game.ModAPI;
 using VRage.Utils;
+using System.Linq;
 
 namespace TSUT.HeatManagement
 {
-    
-    public class GridHeatManager
+
+    public class GridHeatManager : IGridHeatManager
     {
 
         private readonly Dictionary<IMyCubeBlock, IHeatBehavior> _heatBehaviors = new Dictionary<IMyCubeBlock, IHeatBehavior>();
+        private bool _showDebug = false;
 
         public GridHeatManager(IMyCubeGrid grid)
         {
@@ -20,7 +22,7 @@ namespace TSUT.HeatManagement
 
                 try
                 {
-                    factory.CollectHeatBehaviors(grid, _heatBehaviors);
+                    factory.CollectHeatBehaviors(grid, this, _heatBehaviors);
                 }
                 catch (Exception ex)
                 {
@@ -41,8 +43,13 @@ namespace TSUT.HeatManagement
                 IHeatBehavior heatBehavior = _heatBehaviors[block.FatBlock];
                 if (heatBehavior != null)
                 {
-                    heatBehavior.Cleanup();
-                    _heatBehaviors.Remove(block.FatBlock);
+                    if (heatBehavior is IMultiBlockHeatBehavior) {
+                        var multi = heatBehavior as IMultiBlockHeatBehavior;
+                        multi.RemoveBlock(block.FatBlock, this, _heatBehaviors);
+                    } else {
+                        heatBehavior.Cleanup();
+                        _heatBehaviors.Remove(block.FatBlock);
+                    }
                 }
             }
             HeatSession.Api.Utils.PurgeCaches();
@@ -52,17 +59,20 @@ namespace TSUT.HeatManagement
         {
             if (block == null || block.FatBlock == null || _heatBehaviors.ContainsKey(block.FatBlock))
                 return;
-                
+
             foreach (var factory in HeatSession.Api.Registry.GetFactories())
             {
                 if (factory == null)
                     continue;
                 try
                 {
-                    IHeatBehavior behavior = factory.OnBlockAdded(block.FatBlock);
-                    if (behavior != null)
+                    HeatBehaviorAttachResult result = factory.OnBlockAdded(block.FatBlock, this);
+                    if (result?.Behavior != null)
                     {
-                        _heatBehaviors[block.FatBlock] = behavior;
+                        foreach (var affected in result.AffectedBlocks)
+                        {
+                            _heatBehaviors[affected] = result.Behavior;
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -82,17 +92,22 @@ namespace TSUT.HeatManagement
             {
                 if (called.Contains(kvp.Value))
                     continue;
-                called.Add(kvp.Value);  
+                called.Add(kvp.Value);
 
                 IMyCubeBlock block = kvp.Key;
                 IHeatBehavior behavior = kvp.Value;
                 try
                 {
-                    float heatChange = behavior.GetHeatChange(deltaTime);
-                    if (heatChange != 0f)
-                    {
-                        float newHeat =  HeatSession.Api.Utils.ApplyHeatChange(block, heatChange);
-                        behavior.ReactOnNewHeat(newHeat);
+                    if (behavior is IMultiBlockHeatBehavior) {
+                        behavior.SpreadHeat(deltaTime);
+                        behavior.ReactOnNewHeat(0f);
+                    } else {
+                        float heatChange = behavior.GetHeatChange(deltaTime);
+                        if (heatChange != 0f)
+                        {
+                            float newHeat = HeatSession.Api.Utils.ApplyHeatChange(block, heatChange);
+                            behavior.ReactOnNewHeat(newHeat);
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -112,6 +127,9 @@ namespace TSUT.HeatManagement
                 if (called.Contains(kvp.Value))
                     continue;
                 called.Add(kvp.Value);
+
+                if (kvp.Value is IMultiBlockHeatBehavior)
+                    continue;
 
                 IHeatBehavior behavior = kvp.Value;
                 try
@@ -142,5 +160,56 @@ namespace TSUT.HeatManagement
             }
             _heatBehaviors.Clear();
         }
+
+
+        public IHeatBehavior TryGetHeatBehaviour(IMyCubeBlock block)
+        {
+            if (block == null)
+                return null;
+
+            IHeatBehavior behavior;
+            if (_heatBehaviors.TryGetValue(block, out behavior))
+                return behavior;
+
+            return null;
+        }
+
+        public List<HeatPipeManager> GetHeatPipeManagers()
+        {
+            // Return all IHeatBehavior values that are HeatPipeManager
+            return _heatBehaviors.Values
+                .OfType<HeatPipeManager>()
+                .Distinct()
+                .ToList();
+        }
+
+        public void SetShowDebug(bool flag)
+        {
+            _showDebug = flag;
+        }
+
+        public bool GetShowDebug()
+        {
+            return _showDebug;
+        }
+
+        // WARNING!!! Performance intensive call, use carefully!
+        public void UpdateVisuals(float deltaTime)
+        {
+            if (_showDebug) {
+                foreach (var behavior in _heatBehaviors.Values) {
+                    if (behavior is IMultiBlockHeatBehavior) {
+                        var multi = behavior as IMultiBlockHeatBehavior;
+                        multi.ShowDebugGraph(deltaTime);
+                    }
+                }
+            }
+        }
+    }
+
+    public class HeatBehaviorAttachResult
+    {
+        public IHeatBehavior Behavior;
+        public List<IMyCubeBlock> AffectedBlocks = new List<IMyCubeBlock>();
     }
 }

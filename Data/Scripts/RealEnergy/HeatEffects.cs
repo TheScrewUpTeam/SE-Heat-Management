@@ -1,7 +1,10 @@
 using System.Collections.Generic;
 using Sandbox.Game.Lights;
+using Sandbox.ModAPI;
+using Sandbox.ModAPI.Interfaces.Terminal;
 using VRage.Game;
 using VRage.Game.ModAPI;
+using VRage.Utils;
 using VRageMath;
 
 namespace TSUT.HeatManagement

@@ -1,23 +1,25 @@
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Text;
+using Sandbox.Game.Entities;
 using Sandbox.ModAPI;
 using SpaceEngineers.Game.ModAPI;
 using VRage.Game.ModAPI;
 
 namespace TSUT.HeatManagement
 {
-    public class VentHeatManagerFactory : IHeatBehaviorFactory
+    public class HeatVentManagerFactory : IHeatBehaviorFactory
     {
         public void CollectHeatBehaviors(IMyCubeGrid grid, IGridHeatManager manager, IDictionary<IMyCubeBlock, IHeatBehavior> behaviorMap)
         {
-            List<IMyAirVent> vents = new List<IMyAirVent>();
+            List<IMyHeatVent> vents = new List<IMyHeatVent>();
             MyAPIGateway.TerminalActionsHelper.GetTerminalSystemForGrid(grid).GetBlocksOfType(vents);
 
             foreach (var vent in vents)
             {
                 if (!behaviorMap.ContainsKey(vent))
                 {
-                    behaviorMap[vent] = new VentHeatManager(vent, manager);
+                    behaviorMap[vent] = new HeatVentManager(vent, manager);
                 }
             }
         }
@@ -27,23 +29,23 @@ namespace TSUT.HeatManagement
             var result = new HeatBehaviorAttachResult();
             result.AffectedBlocks = new List<IMyCubeBlock> { block };
 
-            if (block is IMyAirVent)
+            if (block is IMyHeatVent)
             {
-                result.Behavior = new VentHeatManager(block as IMyAirVent, manager);
+                result.Behavior = new HeatVentManager(block as IMyHeatVent, manager);
                 return result;
             }
-            return result; // No behavior created for non-vent blocks
+            return result; // No behavior created for non-heat-vent blocks
         }
 
-        public int Priority => 20; // Vents are less critical than batteries
+        public int Priority => 20; // Heat vents are less critical than batteries
     }
     
-    public class VentHeatManager : IHeatBehavior
+    public class HeatVentManager : IHeatBehavior
     {
         private IGridHeatManager _gridManager;
-        private IMyAirVent _vent;
+        private IMyHeatVent _vent;
 
-        public VentHeatManager(IMyAirVent vent, IGridHeatManager manager)
+        public HeatVentManager(IMyHeatVent vent, IGridHeatManager manager)
         {
             _vent = vent;
             _gridManager = manager;
@@ -87,6 +89,13 @@ namespace TSUT.HeatManagement
             var heat = HeatSession.Api.Utils.GetHeat(block);
             float heatChange = GetHeatChange(1f) + cumulativeNeighborHeatChange + cumulativeNetworkHeatChange; // Assuming deltaTime of 1 second for display purposes
 
+            var planet = MyGamePruningStructure.GetClosestPlanet(block.Position);
+            float airDensity = 0f;
+            if (planet != null)
+            {
+                airDensity = planet.GetOxygenForPosition(block.Position); // Based on oxygen, because GetDensity is broken
+            }
+
             builder.AppendLine($"--- Heat Management ---");
             builder.AppendLine($"Temperature: {HeatSession.Api.Utils.GetHeat(block):F2} °C");
             builder.AppendLine($"Air Heat Change: {GetHeatChange(1):F2} °C/s");
@@ -94,7 +103,7 @@ namespace TSUT.HeatManagement
             builder.AppendLine($"Exchange Mode: {exchangeMode}");
             builder.AppendLine($"Thermal Capacity: {ownThermalCapacity / 1000000:F1} MJ/°C");
             builder.AppendLine($"Ambient temp: {HeatSession.Api.Utils.CalculateAmbientTemperature(block):F1} °C");
-            builder.AppendLine($"Air density: {(block as IMyAirVent).GetOxygenLevel() * 100:F1} %");
+            builder.AppendLine($"Air density: {airDensity * 100:F1} %");
             float windSpeed = HeatSession.Api.Utils.GetBlockWindSpeed(block);
             builder.AppendLine($"Wind Speed: {windSpeed:F2} m/s");
             builder.AppendLine($"------");
@@ -117,7 +126,8 @@ namespace TSUT.HeatManagement
                             builder.AppendLine($"- {neighborBlock.DisplayNameText} ({HeatSession.Api.Utils.GetHeat(neighborBlock):F2}°C) -> {neighborWithChange[neighbor]:F4} °C/s");
                         } else {
                             builder.AppendLine($"- {neighborBlock.DisplayNameText} ({HeatSession.Api.Utils.GetHeat(neighborBlock):F2}°C) !! Insulated");
-                        }                    }
+                        }  
+                    }
                 }
             }
             if (connectedPipeNetworks.Count > 0)
@@ -140,7 +150,7 @@ namespace TSUT.HeatManagement
             float change = HeatSession.Api.Utils.GetAmbientHeatLoss(_vent, deltaTime);
             if (_vent.IsFunctional && _vent.Enabled)
             {
-                change += HeatSession.Api.Utils.GetActiveVentHealLoss(_vent, deltaTime);
+                change += HeatSession.Api.Utils.GetActiveHeatVentLoss(_vent, deltaTime); // You may need to implement a custom method for IMyHeatVent
             }
             return -change;
         }
@@ -198,9 +208,9 @@ namespace TSUT.HeatManagement
 
                 float ambientLoss = 0f;
 
-                if (!(neighborFat is IMyAirVent) && !(neighborFat is IMyBatteryBlock))
+                if (!(neighborFat is IMyHeatVent) && !(neighborFat is IMyBatteryBlock))
                 {
-                    // Apply ambient heat exchange for non-vent, non-battery blocks
+                    // Apply ambient heat exchange for non-heat-vent, non-battery blocks
                     ambientLoss = HeatSession.Api.Utils.GetAmbientHeatLoss(neighborFat, deltaTime);
                 }
 
@@ -212,11 +222,6 @@ namespace TSUT.HeatManagement
             }
         }
 
-        public void ReactOnNewHeat(float heat)
-        {
-            HeatSession.Api.Effects.UpdateBlockHeatLight(_vent, heat);
-            this._vent.RefreshCustomInfo();
-            return; // Vents do not react to new heat in this implementation
-        }
+        public void ReactOnNewHeat(float heat){}
     }
-}
+} 

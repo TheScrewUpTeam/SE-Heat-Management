@@ -5,6 +5,7 @@ using VRage.ModAPI;
 using System.Collections.Generic;
 using VRage.Game;
 using VRage.Utils;
+using Sandbox.ModAPI.Interfaces.Terminal;
 
 namespace TSUT.HeatManagement
 {
@@ -24,8 +25,9 @@ namespace TSUT.HeatManagement
             get { return _heatApi; }
         }
 
-        private Dictionary<IMyCubeGrid, GridHeatManager> _gridHeatManagers = new Dictionary<IMyCubeGrid, GridHeatManager>();
+        private static Dictionary<IMyCubeGrid, GridHeatManager> _gridHeatManagers = new Dictionary<IMyCubeGrid, GridHeatManager>();
 
+        private static bool _initialized = false;
         private int _tickCount = 0;
         private int _lastNeighborsUpdateTick = 0;
         private int _lastMainUpdateTick = 0;
@@ -49,10 +51,12 @@ namespace TSUT.HeatManagement
             _heatApi.Registry.RegisterHeatBehaviorFactory(new VentHeatManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new ThrusterHeatManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new HeatPipeManagerFactory());
+            _heatApi.Registry.RegisterHeatBehaviorFactory(new HeatVentManagerFactory());
         }
 
         public override void BeforeStart()
         {
+            RegisterDebugControl();
             MyLog.Default.WriteLine($"[HeatManagement] HeatAPI populated");
             MyAPIGateway.Utilities.SendModMessage(ApiModId, _heatApi);
 
@@ -122,6 +126,11 @@ namespace TSUT.HeatManagement
 
             _heatApi.Effects.UpdateLightsPosition();
 
+            foreach (var manager in _gridHeatManagers.Values)
+                {
+                    manager.UpdateVisuals(MyEngineConstants.UPDATE_STEP_SIZE_IN_SECONDS);
+                }
+
             if (_tickCount % MAIN_UPDATE_INTERVAL == 0)
             {
                 float passedTicks = _tickCount - _lastMainUpdateTick;
@@ -175,6 +184,35 @@ namespace TSUT.HeatManagement
                     _gridHeatManagers.Remove(grid);
                 }
             }
+        }
+
+        public static void RegisterDebugControl()
+        {
+            if (_initialized) return;
+            _initialized = true;
+
+            var checkbox = MyAPIGateway.TerminalControls.CreateControl<IMyTerminalControlCheckbox, IMyBatteryBlock>("ShowHeatNetworks");
+            checkbox.Title = MyStringId.GetOrCompute("Show Heat Networks");
+            checkbox.Tooltip = MyStringId.GetOrCompute("Visualizes all heat pipe connections on this grid.");
+            checkbox.SupportsMultipleBlocks = false;
+
+            checkbox.Getter = block =>
+            {
+                GridHeatManager gridManager;
+                if (HeatSession._gridHeatManagers.TryGetValue(block.CubeGrid, out gridManager)){
+                    return gridManager.GetShowDebug();
+                }
+                return false;
+            };
+            checkbox.Setter = (block, value) =>
+            {
+                GridHeatManager gridManager;
+                if (HeatSession._gridHeatManagers.TryGetValue(block.CubeGrid, out gridManager)){
+                    gridManager.SetShowDebug(value);
+                }
+            };
+
+            MyAPIGateway.TerminalControls.AddControl<IMyBatteryBlock>(checkbox);
         }
     }
 }

@@ -347,6 +347,7 @@ namespace TSUT.HeatManagement
 
             return heatLoss;
         }
+
         public float GetActiveVentHealLoss(IMyAirVent vent, float deltaTime)
         {
             float currentTemp = GetHeat(vent);
@@ -359,6 +360,44 @@ namespace TSUT.HeatManagement
             float heatRemoved = coolingPower * deltaTime * tempDiff / GetThermalCapacity(vent); // Joules removed
 
             return heatRemoved;
+        }
+
+        public float GetActiveHeatVentLoss(IMyHeatVent vent, float deltaTime)
+        {
+            var planet = MyGamePruningStructure.GetClosestPlanet(vent.Position);
+            float airDensity = 0f;
+            if (planet != null)
+            {
+                airDensity = planet.GetOxygenForPosition(vent.Position); // Based on oxygen, because GetDensity is broken
+            }
+
+            float currentTemp = GetHeat(vent);
+            float ambientTemp = CalculateAmbientTemperature(vent) - 2f; // 2 degrees lower than ambient to simulate cooling effect
+            float coolingPower = Config.Instance.VENT_COOLING_RATE * airDensity;
+
+            float tempDiff = currentTemp - ambientTemp;
+
+            float heatRemoved = coolingPower * deltaTime * tempDiff / GetThermalCapacity(vent); // Joules removed
+
+            return heatRemoved;
+        }
+
+        public float GetExchangeWithNeighbor(IMyCubeBlock block, IMyCubeBlock neighbor, float deltaTime)
+        {
+            if (neighbor == null || block == null)
+                return 0f;
+
+            float tempA = HeatSession.Api.Utils.GetHeat(block);
+            float tempB = HeatSession.Api.Utils.GetHeat(neighbor);
+            float capacityA = HeatSession.Api.Utils.GetThermalCapacity(block);
+
+            float tempDiff = tempA - tempB;
+            float contactArea = HeatSession.Api.Utils.GetLargestFaceArea(neighbor.SlimBlock);
+            float energyTransferred = tempDiff * Config.Instance.THERMAL_CONDUCTIVITY * contactArea * deltaTime; // Arbitrary scaling factor for transfer rate
+
+            float deltaA = -energyTransferred / capacityA;
+
+            return deltaA;
         }
 
         public float GetActiveThrusterHeatLoss(IMyThrust thruster, float thrustRatio, float deltaTime)
