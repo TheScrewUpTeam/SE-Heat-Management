@@ -13,7 +13,7 @@ namespace TSUT.HeatManagement
         private readonly Dictionary<IMyCubeBlock, IHeatBehavior> _heatBehaviors = new Dictionary<IMyCubeBlock, IHeatBehavior>();
         private bool _showDebug = false;
 
-        public GridHeatManager(IMyCubeGrid grid)
+        public GridHeatManager(IMyCubeGrid grid, bool lazy = false)
         {
             foreach (var factory in HeatSession.Api.Registry.GetFactories())
             {
@@ -30,8 +30,11 @@ namespace TSUT.HeatManagement
                 }
             }
 
-            grid.OnBlockAdded += OnBlockAdded;
-            grid.OnBlockRemoved += OnBlockRemoved;
+            if (!lazy)
+            {
+                grid.OnBlockAdded += OnBlockAdded;
+                grid.OnBlockRemoved += OnBlockRemoved;
+            }
         }
 
         private void OnBlockRemoved(IMySlimBlock block)
@@ -43,10 +46,13 @@ namespace TSUT.HeatManagement
                 IHeatBehavior heatBehavior = _heatBehaviors[block.FatBlock];
                 if (heatBehavior != null)
                 {
-                    if (heatBehavior is IMultiBlockHeatBehavior) {
+                    if (heatBehavior is IMultiBlockHeatBehavior)
+                    {
                         var multi = heatBehavior as IMultiBlockHeatBehavior;
                         multi.RemoveBlock(block.FatBlock, this, _heatBehaviors);
-                    } else {
+                    }
+                    else
+                    {
                         heatBehavior.Cleanup();
                         _heatBehaviors.Remove(block.FatBlock);
                     }
@@ -98,10 +104,13 @@ namespace TSUT.HeatManagement
                 IHeatBehavior behavior = kvp.Value;
                 try
                 {
-                    if (behavior is IMultiBlockHeatBehavior) {
+                    if (behavior is IMultiBlockHeatBehavior)
+                    {
                         behavior.SpreadHeat(deltaTime);
                         behavior.ReactOnNewHeat(0f);
-                    } else {
+                    }
+                    else
+                    {
                         float heatChange = behavior.GetHeatChange(deltaTime);
                         if (heatChange != 0f)
                         {
@@ -196,9 +205,12 @@ namespace TSUT.HeatManagement
         // WARNING!!! Performance intensive call, use carefully!
         public void UpdateVisuals(float deltaTime)
         {
-            if (_showDebug) {
-                foreach (var behavior in _heatBehaviors.Values) {
-                    if (behavior is IMultiBlockHeatBehavior) {
+            if (_showDebug)
+            {
+                foreach (var behavior in _heatBehaviors.Values)
+                {
+                    if (behavior is IMultiBlockHeatBehavior)
+                    {
                         var multi = behavior as IMultiBlockHeatBehavior;
                         multi.ShowDebugGraph(deltaTime);
                     }

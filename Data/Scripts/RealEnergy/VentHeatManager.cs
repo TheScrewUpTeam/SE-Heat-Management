@@ -97,7 +97,7 @@ namespace TSUT.HeatManagement
             builder.AppendLine($"Exchange Mode: {exchangeMode}");
             builder.AppendLine($"Thermal Capacity: {ownThermalCapacity / 1000000:F1} MJ/°C");
             builder.AppendLine($"Ambient temp: {HeatSession.Api.Utils.CalculateAmbientTemperature(block):F1} °C");
-            builder.AppendLine($"Air density: {(block as IMyAirVent).GetOxygenLevel() * 100:F1} %");
+            builder.AppendLine($"Air density: {HeatSession.Api.Utils.GetAirDensity(_vent) * 100:F1} %");
             float windSpeed = HeatSession.Api.Utils.GetBlockWindSpeed(block);
             builder.AppendLine($"Wind Speed: {windSpeed:F2} m/s");
             builder.AppendLine($"------");

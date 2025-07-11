@@ -171,17 +171,23 @@ namespace TSUT.HeatManagement
             {
                 float tempDiff = Config.Instance.CRITICAL_TEMP - heat;
                 float timeToOverheat = tempDiff / heatChange;
-                TimeSpan timeSpan = TimeSpan.FromSeconds(timeToOverheat);
-                string formattedTime = timeSpan.ToString(@"hh\:mm\:ss");
-                info.AppendLine($"Estimated Time to Overheat: {formattedTime}");
+                if (!float.IsNaN(timeToOverheat) && !float.IsInfinity(timeToOverheat))
+                {
+                    TimeSpan timeSpan = TimeSpan.FromSeconds(timeToOverheat);
+                    string formattedTime = timeSpan.ToString(@"hh\:mm\:ss");
+                    info.AppendLine($"Estimated Time to Overheat: {formattedTime}");
+                }
             }
             else
             {
                 float tempDiff = heat - HeatSession.Api.Utils.CalculateAmbientTemperature(_battery);
                 float timeToCoolDown = tempDiff / Math.Abs(heatChange);
-                TimeSpan timeSpan = TimeSpan.FromSeconds(timeToCoolDown);
-                string formattedTime = timeSpan.ToString(@"hh\:mm\:ss");
-                info.AppendLine($"Estimated Time to cool down: {formattedTime}");
+                if (!float.IsNaN(timeToCoolDown) && !float.IsInfinity(timeToCoolDown))
+                {
+                    TimeSpan timeSpan = TimeSpan.FromSeconds(timeToCoolDown);
+                    string formattedTime = timeSpan.ToString(@"hh\:mm\:ss");
+                    info.AppendLine($"Estimated Time to cool down: {formattedTime}");
+                }
             }
             info.AppendLine("");
             info.AppendLine("Heat Sources:");
@@ -201,7 +207,7 @@ namespace TSUT.HeatManagement
                     {
                         if (!insulatedNeihbors.Contains(neighbor))
                         {
-                            string networkText = networkedNeighbors.Contains(neighbor)?"-NET-":"";
+                            string networkText = networkedNeighbors.Contains(neighbor) ? "-NET-" : "";
                             info.AppendLine($"- {neighborBlock.DisplayNameText}{networkText} ({HeatSession.Api.Utils.GetHeat(neighborBlock):F2}°C) -> {neighborWithChange[neighbor]:F4} °C/s");
                         }
                         else
@@ -260,9 +266,11 @@ namespace TSUT.HeatManagement
                     var network = behaviour as HeatPipeManager;
                     energyTransferred = -network.GetHeatExchange(neighborFat, _battery, deltaTime);
                 }
-                else if(behaviour != null) {
+                else if (behaviour != null)
+                {
                     continue;
-                } else
+                }
+                else
                 {
                     float tempDiff = tempA - tempB;
 

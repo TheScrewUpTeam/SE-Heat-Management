@@ -92,12 +92,7 @@ namespace TSUT.HeatManagement
             var heat = HeatSession.Api.Utils.GetHeat(block);
             float heatChange = GetHeatChange(1f) + cumulativeNeighborHeatChange + cumulativeNetworkHeatChange; // Assuming deltaTime of 1 second for display purposes
 
-            var planet = MyGamePruningStructure.GetClosestPlanet(block.Position);
-            float airDensity = 0f;
-            if (planet != null)
-            {
-                airDensity = planet.GetOxygenForPosition(block.Position); // Based on oxygen, because GetDensity is broken
-            }
+            float airDensity = HeatSession.Api.Utils.GetAirDensity(_vent);
 
             builder.AppendLine($"--- Heat Management ---");
             builder.AppendLine($"Temperature: {HeatSession.Api.Utils.GetHeat(block):F2} °C");

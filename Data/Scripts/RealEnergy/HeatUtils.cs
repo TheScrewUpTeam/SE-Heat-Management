@@ -91,7 +91,8 @@ namespace TSUT.HeatManagement
                 MyAPIGateway.Utilities.ShowNotification($"Wrong heat value for {block.DisplayNameText}: {heat}", 1000);
             }
             block.Storage[HeatKey] = heat.ToString();
-            if (!silent) {
+            if (!silent)
+            {
                 SendHeatToClients(block, heat);
             }
         }
@@ -203,7 +204,10 @@ namespace TSUT.HeatManagement
                 return 20f;
             }
 
-            return GetTemperatureOnPlanet(position);
+
+            var worldPos = block.CubeGrid.GridIntegerToWorld(block.Position);
+
+            return GetTemperatureOnPlanet(worldPos);
         }
 
         public float GetWindSpeed(Vector3D position)
@@ -231,12 +235,13 @@ namespace TSUT.HeatManagement
 
         public float GetAirDensity(IMyCubeBlock block)
         {
-            var planet = MyGamePruningStructure.GetClosestPlanet(block.Position);
+            var worldPos = block.CubeGrid.GridIntegerToWorld(block.Position);
+            var planet = MyGamePruningStructure.GetClosestPlanet(worldPos);
             if (planet == null)
             {
                 return 0;
             }
-            return planet.GetAirDensity(block.Position);
+            return planet.GetAirDensity(worldPos);
         }
 
         public float GetTemperatureOnPlanet(Vector3D position)
@@ -257,8 +262,8 @@ namespace TSUT.HeatManagement
 
             // Sunlight effect
             float fullDayNightTempSwing = 90f;
-            float airDensity = planet.GetOxygenForPosition(position); // Based on oxygen, because GetDensity is broken
-            float swingMultiplier = 1 - airDensity; // 0 at 100% oxygen, 1 at 0% oxygen
+            float airDensity = planet.GetAirDensity(position);
+            float swingMultiplier = 1 - airDensity;
             Vector3 sunDirection = MyVisualScriptLogicProvider.GetSunDirection(); // Already normalized
             Vector3D gravityDirection = -planet.Components.Get<MyGravityProviderComponent>().GetWorldGravityNormalized(position);
             float dot = (float)Vector3D.Dot(gravityDirection, sunDirection); // dot of up and sun direction
@@ -358,10 +363,13 @@ namespace TSUT.HeatManagement
             var airDensity = GetAirDensity(block);
 
             float energyLoss = 0;
-            if (airDensity > 0) {
+            if (airDensity > 0)
+            {
                 // If there are atmo aroung - just exchange heat with it
                 energyLoss = (currentHeat - ambientTemp) * surfaceArea * Config.Instance.HEAT_COOLDOWN_COEFF * deltaTime;
-            } else {
+            }
+            else
+            {
                 // If in space - radiate at least something
                 energyLoss = surfaceArea * Config.Instance.HEAT_RADIATION_COEFF * deltaTime;
             }
@@ -374,7 +382,7 @@ namespace TSUT.HeatManagement
         {
             float currentTemp = GetHeat(vent);
             float ambientTemp = CalculateAmbientTemperature(vent) - 2f; // 2 degrees lower than ambient to simulate cooling effect
-            float airDensity = vent.GetOxygenLevel();
+            float airDensity = GetAirDensity(vent);
             float coolingPower = Config.Instance.VENT_COOLING_RATE * airDensity;
 
             float tempDiff = currentTemp - ambientTemp;
@@ -386,13 +394,7 @@ namespace TSUT.HeatManagement
 
         public float GetActiveHeatVentLoss(IMyHeatVent vent, float deltaTime)
         {
-            var planet = MyGamePruningStructure.GetClosestPlanet(vent.Position);
-            float airDensity = 0f;
-            if (planet != null)
-            {
-                airDensity = planet.GetOxygenForPosition(vent.Position); // Based on oxygen, because GetDensity is broken
-            }
-
+            float airDensity = GetAirDensity(vent);
             float currentTemp = GetHeat(vent);
             float ambientTemp = CalculateAmbientTemperature(vent) - 2f; // 2 degrees lower than ambient to simulate cooling effect
             float coolingPower = Config.Instance.VENT_COOLING_RATE * airDensity;
