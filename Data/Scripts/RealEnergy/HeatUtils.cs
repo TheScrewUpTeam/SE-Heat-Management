@@ -12,7 +12,7 @@ using VRageMath;
 
 namespace TSUT.HeatManagement
 {
-    public class HeatUtils: IHeatUtils
+    public class HeatUtils : IHeatUtils
     {
         public readonly Guid HeatKey = new Guid("decafbad-0000-4c00-babe-c0ffee000001");
 
@@ -86,7 +86,8 @@ namespace TSUT.HeatManagement
                 block.Storage = new MyModStorageComponent();
             }
 
-            if (float.IsNaN(heat) || float.IsInfinity(heat)){
+            if (float.IsNaN(heat) || float.IsInfinity(heat))
+            {
                 MyAPIGateway.Utilities.ShowNotification($"Wrong heat value for {block.DisplayNameText}: {heat}", 1000);
             }
             block.Storage[HeatKey] = heat.ToString();
@@ -225,6 +226,16 @@ namespace TSUT.HeatManagement
             return GetWindSpeed(block.GetPosition()) + GetGridSpeed(block);
         }
 
+        public float GetAirDensity(IMyCubeBlock block)
+        {
+            var planet = MyGamePruningStructure.GetClosestPlanet(block.Position);
+            if (planet == null)
+            {
+                return 0;
+            }
+            return planet.GetAirDensity(block.Position);
+        }
+
         public float GetTemperatureOnPlanet(Vector3D position)
         {
             float ambientTemp = -180f; // Ambient space temperature
@@ -341,8 +352,16 @@ namespace TSUT.HeatManagement
             var currentHeat = GetHeat(block);
             var thermalCapacity = GetThermalCapacity(block);
             var surfaceArea = GetRealSurfaceArea(block);
+            var airDensity = GetAirDensity(block);
 
-            float energyLoss = (currentHeat - ambientTemp) * surfaceArea * Config.Instance.HEAT_COOLDOWN_COEFF * deltaTime;
+            float energyLoss = 0;
+            if (airDensity > 0) {
+                // If there are atmo aroung - just exchange heat with it
+                energyLoss = (currentHeat - ambientTemp) * surfaceArea * Config.Instance.HEAT_COOLDOWN_COEFF * deltaTime;
+            } else {
+                // If in space - radiate at least something
+                energyLoss = surfaceArea * Config.Instance.HEAT_RADIATION_COEFF * deltaTime;
+            }
             float heatLoss = energyLoss / thermalCapacity; // °C lost
 
             return heatLoss;

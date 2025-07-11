@@ -6,6 +6,7 @@ namespace TSUT.HeatManagement
     public class Config
     {
         public float HEAT_COOLDOWN_COEFF { get; set; } = 20f;
+        public float HEAT_RADIATION_COEFF { get; set; } = 5f;
         public float DISCHARGE_HEAT_FRACTION { get; set; } = 0.20f;
         public float THERMAL_CONDUCTIVITY { get; set; } = 200f;
         public float VENT_COOLING_RATE { get; set; } = 1000f;

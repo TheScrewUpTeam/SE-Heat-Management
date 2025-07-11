@@ -22,12 +22,13 @@ namespace TSUT.HeatManagement
     {
         public HeatPipeNode A;
         public HeatPipeNode B;
-        public float Conductance = Config.Instance.HEATPIPE_CONDUCTIVITY; // or resistance
+        public float Conductance = Config.Instance.HEATPIPE_CONDUCTIVITY * 30; // or resistance mult by 30 for faster heat expansion
     }
 
     public class HeatPipeManagerFactory : IHeatBehaviorFactory
     {
         public static readonly List<string> HeatPipeSubtypeMask = new List<string> {
+            // Large grid blocks
             "AirDuct",
             "AirDuct1",
             "AirDuct2",
@@ -43,7 +44,15 @@ namespace TSUT.HeatManagement
             "LargeBlockPipesJunction",
             "LargeBlockPipesCornerOuter",
             "LargeBlockPipesCorner",
-            "LargeBlockPipesCornerInner"
+            "LargeBlockPipesCornerInner",
+            // Small grid blocks
+            "SmallBlockConveyor",
+            "ConveyorTubeSmall",
+            "ConveyorTubeSmallCurved",
+            "ConveyorTubeSmallT",
+            "ConveyorTubeDuctSmall",
+            "ConveyorTubeDuctSmallCurved",
+            "ConveyorTubeDuctSmallT"
         };
 
         public static readonly Dictionary<string, VRageMath.Base6Directions.Direction[]> PipeConnectionMap = new Dictionary<string, Base6Directions.Direction[]>()
@@ -64,9 +73,17 @@ namespace TSUT.HeatManagement
             { "LargeBlockPipesCornerOuter", new[] { Base6Directions.Direction.Forward, Base6Directions.Direction.Down } },
             { "LargeBlockPipesCornerInner", new[] { Base6Directions.Direction.Up, Base6Directions.Direction.Right } },
             { "LargeBlockPipesCorner", new[] { Base6Directions.Direction.Forward, Base6Directions.Direction.Right } },
+
+            { "SmallBlockConveyor", new[] { Base6Directions.Direction.Forward, Base6Directions.Direction.Backward, Base6Directions.Direction.Left, Base6Directions.Direction.Right, Base6Directions.Direction.Up, Base6Directions.Direction.Down } },
+            { "ConveyorTubeSmall", new[] { Base6Directions.Direction.Forward, Base6Directions.Direction.Backward } },
+            { "ConveyorTubeSmallCurved", new[] { Base6Directions.Direction.Backward, Base6Directions.Direction.Down } },
+            { "ConveyorTubeSmallT", new[] { Base6Directions.Direction.Forward, Base6Directions.Direction.Backward, Base6Directions.Direction.Down } },
+            { "ConveyorTubeDuctSmall", new[] { Base6Directions.Direction.Forward, Base6Directions.Direction.Backward } },
+            { "ConveyorTubeDuctSmallCurved", new[] { Base6Directions.Direction.Backward, Base6Directions.Direction.Down } },
+            { "ConveyorTubeDuctSmallT", new[] { Base6Directions.Direction.Forward, Base6Directions.Direction.Backward, Base6Directions.Direction.Down } },
         };
 
-        public void CollectHeatBehaviors(IMyCubeGrid grid, IGridHeatManager gridManager, IDictionary<IMyCubeBlock, IHeatBehavior> behaviorMap)
+        public void CollectHeatBehaviorsOld(IMyCubeGrid grid, IGridHeatManager gridManager, IDictionary<IMyCubeBlock, IHeatBehavior> behaviorMap)
         {
             List<HeatPipeManager> gridPipeManagers = new List<HeatPipeManager>();
             MyLog.Default.WriteLine($"[HeatManagement] Start collecting on {grid.DisplayName}...");
@@ -157,6 +174,52 @@ namespace TSUT.HeatManagement
             MyLog.Default.WriteLine($"[HeatManagement] Grid {grid.DisplayName} processed. Active managers: {gridPipeManagers.Count}");
         }
 
+        public void CollectHeatBehaviors(IMyCubeGrid grid, IGridHeatManager gridManager, IDictionary<IMyCubeBlock, IHeatBehavior> behaviorMap)
+        {
+            MyLog.Default.WriteLine($"[HeatManagement] Start collecting on {grid.DisplayName}...");
+
+            List<IMySlimBlock> slimBlocks = new List<IMySlimBlock>();
+            grid.GetBlocks(slimBlocks);
+
+            var pipeBlocks = slimBlocks
+                .Where(s => s.FatBlock != null && HeatPipeSubtypeMask.Contains(s.FatBlock.BlockDefinition.SubtypeName))
+                .Select(s => s.FatBlock)
+                .ToList();
+
+            foreach (var pipe in pipeBlocks)
+            {
+                if (behaviorMap.ContainsKey(pipe))
+                    continue;
+
+                var result = OnBlockAdded(pipe, gridManager);
+
+                if (result.Behavior != null)
+                {
+                    foreach (var block in result.AffectedBlocks)
+                    {
+                        behaviorMap[block] = result.Behavior;
+                    }
+                }
+            }
+
+            MyLog.Default.WriteLine($"[HeatManagement] Grid {grid.DisplayName} processed. Networks created: {behaviorMap.Values.OfType<HeatPipeManager>().Distinct().Count()}");
+        }
+
+
+        public static Base6Directions.Direction TransformDirection(MatrixI orientation, Base6Directions.Direction localDirection)
+        {
+            switch (localDirection)
+            {
+                case Base6Directions.Direction.Forward: return orientation.Forward;
+                case Base6Directions.Direction.Backward: return Base6Directions.GetOppositeDirection(orientation.Forward);
+                case Base6Directions.Direction.Up: return orientation.Up;
+                case Base6Directions.Direction.Down: return Base6Directions.GetOppositeDirection(orientation.Up);
+                case Base6Directions.Direction.Left: return Base6Directions.GetOppositeDirection(orientation.Right);
+                case Base6Directions.Direction.Right: return orientation.Right;
+                default: return Base6Directions.Direction.Forward;
+            }
+        }
+
         public static bool IsPipeConnectedToBlock(IMyCubeBlock pipe, IMyCubeBlock targetBlock)
         {
             Base6Directions.Direction[] pipeDirs;
@@ -164,20 +227,36 @@ namespace TSUT.HeatManagement
             if (!PipeConnectionMap.TryGetValue(pipe.BlockDefinition.SubtypeName, out pipeDirs))
                 return false;
 
-            var orientationPipe = pipe.Orientation;
-            var posPipe = pipe.Position;
-            var posTarget = targetBlock.Position;
+            var pipePos = pipe.Position;
+            var pipeMatrix = new MatrixI(pipe.Orientation);
+
+            // Collect all positions occupied by the target block
+            var occupiedPositions = new HashSet<Vector3I>();
+            var min = targetBlock.SlimBlock.Min;
+            var max = targetBlock.SlimBlock.Max;
+
+            for (int x = min.X; x <= max.X; x++)
+            {
+                for (int y = min.Y; y <= max.Y; y++)
+                {
+                    for (int z = min.Z; z <= max.Z; z++)
+                    {
+                        occupiedPositions.Add(new Vector3I(x, y, z));
+                    }
+                }
+            }
 
             foreach (var dir in pipeDirs)
             {
-                // Convert pipe's local port to world direction
-                var worldDir = orientationPipe.TransformDirection(dir);
+                // Convert pipe local port to world direction
+                var worldDir = TransformDirection(pipeMatrix, dir);
                 var offset = Base6Directions.GetIntVector(worldDir);
-                var expectedNeighborPos = posPipe + offset;
+                var neighborPos = pipePos + offset;
 
-                // Check if target block is in that direction
-                if (posTarget == expectedNeighborPos)
+                if (occupiedPositions.Contains(neighborPos))
+                {
                     return true;
+                }
             }
 
             return false;
@@ -302,6 +381,8 @@ namespace TSUT.HeatManagement
                 {
                     manager.TryConnectNodes(newNode, kvp.Key);
                 }
+                result.Behavior = manager;
+                result.AffectedBlocks = new List<IMyCubeBlock> { block };
                 return result;
             }
 
@@ -493,12 +574,8 @@ namespace TSUT.HeatManagement
             if (node == null)
                 return 0f;
 
-            // Ensure the neighbor is physically adjacent (e.g., direct contact)
-            var offset = neighbor.Position - network.Position;
-            if (offset.RectangularLength() != 1)
-                return 0f;
-
-            if (!HeatPipeManagerFactory.IsPipeConnectedToBlock(node.Block, neighbor)) {
+            if (!HeatPipeManagerFactory.IsPipeConnectedToBlock(node.Block, neighbor))
+            {
                 return 0f;
             }
 
@@ -508,7 +585,7 @@ namespace TSUT.HeatManagement
 
             float tempDiff = tempOther - tempPipe;
 
-            float contactArea = HeatSession.Api.Utils.GetLargestFaceArea(network.SlimBlock);
+            float contactArea = HeatSession.Api.Utils.GetLargestFaceArea(neighbor.SlimBlock);
 
             // Use global pipe-to-block conductance config
             float conductance = Config.Instance.HEATPIPE_CONDUCTIVITY;
@@ -545,8 +622,10 @@ namespace TSUT.HeatManagement
 
         public void Cleanup() => _nodes = null;
 
-        public void ReactOnNewHeat(float heat) { 
-            foreach (var node in _nodes) {
+        public void ReactOnNewHeat(float heat)
+        {
+            foreach (var node in _nodes)
+            {
                 HeatSession.Api.Effects.UpdateBlockHeatLight(node.Block, HeatSession.Api.Utils.GetHeat(node.Block));
             }
         }

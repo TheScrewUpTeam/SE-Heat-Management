@@ -72,7 +72,10 @@ namespace TSUT.HeatManagement
                     {
                         var network = behavior as HeatPipeManager;
                         if (HeatPipeManagerFactory.IsPipeConnectedToBlock(neighbor.FatBlock, _vent)){
-                            connectedPipeNetworks.Add(network);
+                            if (!connectedPipeNetworks.Contains(network))
+                            {
+                                connectedPipeNetworks.Add(network);
+                            }
                             neighborWithChange[neighbor] = network.GetHeatExchange(neighbor.FatBlock, _vent, 1) / ownThermalCapacity;
                             cumulativeNetworkHeatChange += neighborWithChange[neighbor];
                         } else {
