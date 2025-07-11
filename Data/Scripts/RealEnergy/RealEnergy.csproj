@@ -60,6 +60,8 @@
     <Compile Include="ThrusterHeatManager.cs" />
     <Compile Include="HeatPipeManager.cs" />
     <Compile Include="HeatVentManager.cs" />
+    <Compile Include="HeatNetwork.cs" />
+    <Compile Include="Networking.cs" />
     <Compile Include="Session.cs" />
   </ItemGroup>
   <ItemGroup>
