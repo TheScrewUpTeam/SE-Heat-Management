@@ -69,6 +69,7 @@ namespace TSUT.HeatManagement
         float GetBlockWindSpeed(IMyCubeBlock block);
         float GetExchangeWithNeighbor(IMyCubeBlock block, IMyCubeBlock neighbor, float deltaTime);
         float GetAirDensity(IMyCubeBlock block);
+        float GetActiveExhaustHeatLoss(IMyExhaustBlock exhaust, float deltaTime);
     }
 
     public interface IHeatEffects

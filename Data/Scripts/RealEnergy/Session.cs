@@ -11,6 +11,7 @@ using VRage.GameServices;
 using SpaceEngineers.Game.ModAPI;
 using Sandbox.ModAPI.Interfaces.Terminal;
 using Sandbox.Game;
+using TSUT.HeatManagement;
 
 namespace TSUT.HeatManagement
 {
@@ -61,6 +62,7 @@ namespace TSUT.HeatManagement
 
             _heatApi.Registry.RegisterHeatBehaviorFactory(new BatteryHeatManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new VentHeatManagerFactory());
+            _heatApi.Registry.RegisterHeatBehaviorFactory(new ExhaustHeatManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new ThrusterHeatManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new HeatPipeManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new HeatVentManagerFactory());

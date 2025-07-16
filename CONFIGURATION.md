@@ -15,6 +15,8 @@ This document explains each configuration variable available in the mod, helping
 | `SMOKE_TRESHOLD` | float (derived) | 135.0 | **Smoke threshold.** Calculated as 90% of `CRITICAL_TEMP`. When block temperature exceeds this, visual smoke effects may appear. |
 | `WIND_COOLING_MULT` | float | 0.1 | **Wind cooling multiplier.** Modifies how much wind (planetary atmosphere) helps cool blocks. Increase for stronger wind cooling effects. |
 | `LIMIT_TO_PLAYER_GRIDS` | bool | false | **Limit to player grids.** If true, only grids owned by players are affected by the heat system. Set to false to include all grids. |
+| `EXHAUST_HEAT_REJECTION_RATE` | float | 5000 | Controls the rate at which exhaust blocks reject heat to the environment (joules/second). |
+
 
 ## How to Edit
 - The configuration file is named `TSUT_HeatManagement_Config.xml` and is located in your world storage.

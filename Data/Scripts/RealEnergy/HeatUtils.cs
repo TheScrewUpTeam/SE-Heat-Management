@@ -424,6 +424,24 @@ namespace TSUT.HeatManagement
             return deltaA;
         }
 
+        public float GetActiveExhaustHeatLoss(IMyExhaustBlock exhaust, float deltaTime)
+        {
+            float baseRate = Config.Instance.EXHAUST_HEAT_REJECTION_RATE; // Rename to be exhaust-specific
+
+            float currentTemp = GetHeat(exhaust);
+            float ambientTemp = CalculateAmbientTemperature(exhaust);
+            float deltaT = currentTemp - ambientTemp;
+
+            // Base effectiveness modifier simulates diminishing return at very high delta-T (IRL heat rejection efficiency flattens)
+            float efficiencyFactor = 1f - (float)Math.Exp(-deltaT / 100f); // Adjustable curve
+
+            // Space exhausts still work, but slightly less effectively due to lack of convective medium
+            float atmosphericFactor = MathHelper.Clamp(GetAirDensity(exhaust), 0.5f, 1f);
+
+            float totalJoulesRemoved = deltaT * baseRate * efficiencyFactor * atmosphericFactor * deltaTime;
+            return totalJoulesRemoved / GetThermalCapacity(exhaust); // Return °C/sec
+        }
+
         public float GetActiveThrusterHeatLoss(IMyThrust thruster, float thrustRatio, float deltaTime)
         {
             float baseCoolingRate = Config.Instance.THRUSTER_COOLING_RATE; // Tunable parameter

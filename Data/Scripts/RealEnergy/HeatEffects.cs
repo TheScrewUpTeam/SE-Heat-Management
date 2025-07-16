@@ -46,14 +46,24 @@ namespace TSUT.HeatManagement
                 _lights[block] = light;
             }
 
-            // Update light intensity and color based on heat
-            float normalizedHeat = MathHelper.Clamp(heat / 100f, 0f, 1f);
-            light.Intensity = normalizedHeat * 50f;  // adjust max brightness as needed
+            // Get ambient temperature for the block
+            float ambient = HeatSession.Api.Utils.CalculateAmbientTemperature(block);
+            float delta = heat - ambient;
 
-            // From black to orange/red glow
-            light.Color = Color.Lerp(Color.Black, Color.OrangeRed, normalizedHeat);
+            if (delta <= 0f)
+            {
+                light.Intensity = 0f;
+                light.Color = Color.Black;
+            }
+            else
+            {
+                // Normalize delta for glow (e.g., 0°C = no glow, 100°C above ambient = max glow)
+                float normalizedDelta = MathHelper.Clamp(delta / 50f, 0f, 1f);
+                light.Intensity = normalizedDelta * 50f;  // adjust max brightness as needed
+                light.Color = Color.Lerp(Color.Black, Color.OrangeRed, normalizedDelta);
+            }
 
-            // Update light position (in case battery moves)
+            // Update light position (in case block moves)
             light.Position = block.GetPosition() + block.WorldMatrix.Up * 0.2f;
             light.UpdateLight();
         }
