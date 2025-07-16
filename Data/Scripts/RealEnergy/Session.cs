@@ -5,13 +5,8 @@ using VRage.ModAPI;
 using System.Collections.Generic;
 using VRage.Game;
 using VRage.Utils;
-using System;
-using VRage.Network;
-using VRage.GameServices;
 using SpaceEngineers.Game.ModAPI;
 using Sandbox.ModAPI.Interfaces.Terminal;
-using Sandbox.Game;
-using TSUT.HeatManagement;
 
 namespace TSUT.HeatManagement
 {
@@ -73,29 +68,11 @@ namespace TSUT.HeatManagement
             networking?.Unregister();
         }
 
-        private void OnHeatMessageReceived(ushort channel, byte[] data, ulong senderSteamId, bool fromServer)
-        {
-            MyLog.Default.WriteLine($"[Network] Message received: ch {channel}, s: {senderSteamId}, serv: {fromServer}");
-            if (!fromServer) return; // extra safety: ignore client-sent data
-
-            var msg = MyAPIGateway.Utilities.SerializeFromBinary<HeatSyncMessage>(data);
-            IMyEntity ent;
-            if (MyAPIGateway.Entities.TryGetEntityById(msg.EntityId, out ent))
-            {
-                var block = ent as IMyCubeBlock;
-                if (block != null)
-                {
-                    // Do something with block + msg.Heat
-                    MyLog.Default.WriteLine($"[Heat] {block.DisplayNameText}: {msg.Heat} °C");
-                }
-            }
-        }
-
         public override void BeforeStart()
         {
             networking.Register();
             RegisterDebugControl();
-            MyLog.Default.WriteLine($"[HeatManagement] HeatAPI populated");
+            // MyLog.Default.WriteLine($"[HeatManagement] HeatAPI populated"); // No grid context, cannot wrap
             MyAPIGateway.Utilities.SendModMessage(ApiModId, _heatApi);
 
             HashSet<IMyEntity> allEntities = new HashSet<IMyEntity>();
@@ -119,7 +96,7 @@ namespace TSUT.HeatManagement
                 manager.Cleanup();
                 _gridHeatManagers.Remove(grid);
             }
-            if (_ownershipSubscribedGrids.Contains(grid)) 
+            if (_ownershipSubscribedGrids.Contains(grid))
             {
                 grid.OnBlockAdded -= OnBlockAdded;
                 _ownershipSubscribedGrids.Remove(grid);
@@ -153,41 +130,68 @@ namespace TSUT.HeatManagement
 
         private static bool IsPlayrGrid(IMyCubeGrid grid)
         {
-            MyLog.Default.WriteLine($"[HMS.IsPlayerGrid] Working on {grid.DisplayName}...");
+            if (grid.CustomName.Contains(Config.HeatDebugString))
+            {
+                MyLog.Default.WriteLine($"[HMS.IsPlayerGrid] Working on {grid.DisplayName}...");
+            }
             if (grid == null)
                 return false;
 
             var terminalBlocks = new List<IMyTerminalBlock>();
             MyAPIGateway.TerminalActionsHelper.GetTerminalSystemForGrid(grid)?.GetBlocks(terminalBlocks);
-            MyLog.Default.WriteLine($"[HMS.IsPlayerGrid] Got {terminalBlocks.Count} blocks...");
+            if (grid.CustomName.Contains(Config.HeatDebugString))
+            {
+                MyLog.Default.WriteLine($"[HMS.IsPlayerGrid] Got {terminalBlocks.Count} blocks...");
+            }
             foreach (var block in terminalBlocks)
             {
-                MyLog.Default.WriteLine($"[HMS.IsPlayerGrid] Checking {block.CustomName}...");
+                if (grid.CustomName.Contains(Config.HeatDebugString))
+                {
+                    MyLog.Default.WriteLine($"[HMS.IsPlayerGrid] Checking {block.CustomName}...");
+                }
                 if (block.OwnerId == 0)
                     continue;
 
-                MyLog.Default.WriteLine($"[HMS.IsPlayerGrid] Has owner ID {block.OwnerId}");
+                if (grid.CustomName.Contains(Config.HeatDebugString))
+                {
+                    MyLog.Default.WriteLine($"[HMS.IsPlayerGrid] Has owner ID {block.OwnerId}");
+                }
 
                 var identity = MyAPIGateway.Players.TryGetIdentityId(block.OwnerId);
                 if (identity != null)
                 {
-                    MyLog.Default.WriteLine($"[HMS.IsPlayerGrid] Identity found");
+                    if (grid.CustomName.Contains(Config.HeatDebugString))
+                    {
+                        MyLog.Default.WriteLine($"[HMS.IsPlayerGrid] Identity found");
+                    }
                     return true; // At least one terminal block is owned by a player
                 }
             }
 
-            MyLog.Default.WriteLine($"[HMS.IsPlayerGrid] No suitable block found");
+            if (grid.CustomName.Contains(Config.HeatDebugString))
+            {
+                MyLog.Default.WriteLine($"[HMS.IsPlayerGrid] No suitable block found");
+            }
 
             return false;
         }
 
-        private void OnBlockAdded(IMySlimBlock block) {
-            MyLog.Default.WriteLine($"[HMS.OnBlockAdd] checking {block.BlockDefinition.DisplayNameText}");
-            if (block.FatBlock == null) {
+        private void OnBlockAdded(IMySlimBlock block)
+        {
+            if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
+            {
+                MyLog.Default.WriteLine($"[HMS.OnBlockAdd] checking {block.BlockDefinition.DisplayNameText}");
+            }
+            if (block.FatBlock == null)
+            {
                 return;
             }
-            if (block.FatBlock is IMyTerminalBlock) {
-                MyLog.Default.WriteLine($"[HMS.OnBlockAdd] It is terminal block...");
+            if (block.FatBlock is IMyTerminalBlock)
+            {
+                if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
+                {
+                    MyLog.Default.WriteLine($"[HMS.OnBlockAdd] It is terminal block...");
+                }
                 OnAnyBlockOwnershipChanged(block.FatBlock as IMyTerminalBlock);
             }
         }
@@ -250,7 +254,10 @@ namespace TSUT.HeatManagement
             {
                 bool shouldHave = IsPlayrGrid(grid);
                 bool has = _gridHeatManagers.ContainsKey(grid);
-                MyLog.Default.WriteLine($"[HMS.OnGridOwnershipChanged] ShouldHave: {shouldHave}, has: {has}");
+                if (grid.CustomName.Contains(Config.HeatDebugString))
+                {
+                    MyLog.Default.WriteLine($"[HMS.OnGridOwnershipChanged] ShouldHave: {shouldHave}, has: {has}");
+                }
                 if (shouldHave && !has)
                 {
                     _gridHeatManagers[grid] = new GridHeatManager(grid);

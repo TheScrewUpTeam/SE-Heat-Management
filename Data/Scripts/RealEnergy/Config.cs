@@ -6,7 +6,7 @@ namespace TSUT.HeatManagement
     public class Config
     {
         public static ushort HeatSyncMessageId = 7949; // Choose any unused ushort value
-
+        public static string HeatDebugString = "HeatDebug";
 
         public float HEAT_COOLDOWN_COEFF { get; set; } = 20f;
         public float HEAT_RADIATION_COEFF { get; set; } = 5f;
