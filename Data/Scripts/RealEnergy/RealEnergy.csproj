@@ -58,6 +58,9 @@
     <Compile Include="BatteryHeatManager.cs" />
     <Compile Include="VentHeatManager.cs" />
     <Compile Include="ThrusterHeatManager.cs" />
+    <Compile Include="HeatPipeManager.cs" />
+    <Compile Include="HeatVentManager.cs" />
+    <Compile Include="ExhaustHeatManager.cs" />
     <Compile Include="HeatNetwork.cs" />
     <Compile Include="Networking.cs" />
     <Compile Include="Session.cs" />

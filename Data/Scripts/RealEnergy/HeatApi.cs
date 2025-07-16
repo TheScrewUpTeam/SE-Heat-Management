@@ -7,6 +7,18 @@ using VRageMath;
 
 namespace TSUT.HeatManagement
 {
+    public interface IGridHeatManager
+    {
+        void Cleanup();
+        IHeatBehavior TryGetHeatBehaviour(IMyCubeBlock block);
+        void UpdateBlocksTemp(float deltaTime);
+        void UpdateNeighborsTemp(float deltaTime);
+        void UpdateVisuals(float deltaTime);
+        List<HeatPipeManager> GetHeatPipeManagers();
+        void SetShowDebug(bool flag);
+        bool GetShowDebug();
+    }
+
     public interface IHeatBehavior
     {
         float GetHeatChange(float deltaTime);
@@ -15,10 +27,16 @@ namespace TSUT.HeatManagement
         void ReactOnNewHeat(float heat);
     }
 
+    public interface IMultiBlockHeatBehavior : IHeatBehavior
+    {
+        void RemoveBlock(IMyCubeBlock block, IGridHeatManager gridManager, Dictionary<IMyCubeBlock, IHeatBehavior> behaviorMap);
+        void ShowDebugGraph(float deltaTime);
+    }
+
     public interface IHeatBehaviorFactory
     {
-        void CollectHeatBehaviors(IMyCubeGrid grid, IDictionary<IMyCubeBlock, IHeatBehavior> behaviorMap);
-        IHeatBehavior OnBlockAdded(IMyCubeBlock block);
+        void CollectHeatBehaviors(IMyCubeGrid grid, IGridHeatManager manager, IDictionary<IMyCubeBlock, IHeatBehavior> behaviorMap);
+        HeatBehaviorAttachResult OnBlockAdded(IMyCubeBlock block, IGridHeatManager manager);
         int Priority { get; }
     }
 
@@ -34,6 +52,7 @@ namespace TSUT.HeatManagement
         float EstimateSpecificHeat(float density);
         float GetActiveThrusterHeatLoss(IMyThrust thruster, float thrustRatio, float deltaTime);
         float GetActiveVentHealLoss(IMyAirVent vent, float deltaTime);
+        float GetActiveHeatVentLoss(IMyHeatVent vent, float deltaTime);
         float GetAmbientHeatLoss(IMyCubeBlock block, float deltaTime);
         float GetDensity(IMyCubeBlock block);
         float GetHeat(IMyCubeBlock block);
@@ -48,6 +67,9 @@ namespace TSUT.HeatManagement
         void SetHeat(IMyCubeBlock block, float heat, bool silent = true);
         float ApplyHeatChange(IMyCubeBlock block, float heatChange);
         float GetBlockWindSpeed(IMyCubeBlock block);
+        float GetExchangeWithNeighbor(IMyCubeBlock block, IMyCubeBlock neighbor, float deltaTime);
+        float GetAirDensity(IMyCubeBlock block);
+        float GetActiveExhaustHeatLoss(IMyExhaustBlock exhaust, float deltaTime);
     }
 
     public interface IHeatEffects

@@ -5,18 +5,19 @@ using VRage.Game.ModAPI;
 
 namespace TSUT.HeatManagement
 {
-    public class ThrusterHeatManagerFactory : IHeatBehaviorFactory
+    // Factory for registering ExhaustHeatManager
+    public class ExhaustHeatManagerFactory : IHeatBehaviorFactory
     {
         public void CollectHeatBehaviors(IMyCubeGrid grid, IGridHeatManager manager, IDictionary<IMyCubeBlock, IHeatBehavior> behaviorMap)
         {
-            List<IMyThrust> thrusters = new List<IMyThrust>();
-            MyAPIGateway.TerminalActionsHelper.GetTerminalSystemForGrid(grid).GetBlocksOfType(thrusters);
+            List<IMyExhaustBlock> exhausts = new List<IMyExhaustBlock>();
+            MyAPIGateway.TerminalActionsHelper.GetTerminalSystemForGrid(grid).GetBlocksOfType(exhausts);
 
-            foreach (var thruster in thrusters)
+            foreach (var exhaust in exhausts)
             {
-                if (!behaviorMap.ContainsKey(thruster))
+                if (!behaviorMap.ContainsKey(exhaust))
                 {
-                    behaviorMap[thruster] = new ThrusterHeatManager(thruster, manager);
+                    behaviorMap[exhaust] = new ExhaustHeatManager(exhaust, manager);
                 }
             }
         }
@@ -26,35 +27,35 @@ namespace TSUT.HeatManagement
             var result = new HeatBehaviorAttachResult();
             result.AffectedBlocks = new List<IMyCubeBlock> { block };
 
-            if (block is IMyThrust)
+            if (block is IMyExhaustBlock)
             {
-                result.Behavior = new ThrusterHeatManager(block as IMyThrust, manager);
+                result.Behavior = new ExhaustHeatManager(block as IMyExhaustBlock, manager);
                 return result;
             }
-            return result; // No behavior created for non-thruster blocks
+            return result; // No behavior created for non-exhaust blocks
         }
 
-        public int Priority => 30; // Thrusters are less critical than batteries and vents
+        public int Priority => 25; // Between vents and thrusters
     }
 
-    public class ThrusterHeatManager : IHeatBehavior
+    // Manages heat for exhaust blocks 
+    public class ExhaustHeatManager : IHeatBehavior
     {
         private IGridHeatManager _gridManager;
-        private IMyThrust _thruster;
+        private IMyExhaustBlock _exhaust;
 
-        public ThrusterHeatManager(IMyThrust thruster, IGridHeatManager manager)
+        public ExhaustHeatManager(IMyExhaustBlock exhaust, IGridHeatManager manager)
         {
-            _thruster = thruster;
+            _exhaust = exhaust;
             _gridManager = manager;
-            _thruster.AppendingCustomInfo += AppendThrusterHeatInfo;
+            _exhaust.AppendingCustomInfo += AppendExhaustHeatInfo;
         }
 
-        private void AppendThrusterHeatInfo(IMyTerminalBlock block, StringBuilder builder)
+        private void AppendExhaustHeatInfo(IMyTerminalBlock block, StringBuilder builder)
         {
             float heat = HeatSession.Api.Utils.GetHeat(block);
             float capacity = HeatSession.Api.Utils.GetThermalCapacity(block);
             float ambient = HeatSession.Api.Utils.CalculateAmbientTemperature(block);
-            float outputRatio = (_thruster.MaxThrust > 0f) ? (_thruster.CurrentThrust / _thruster.MaxThrust) : 0f;
 
             var connectedPipeNetworks = new List<HeatPipeManager>();
             var neighborWithChange = new Dictionary<IMySlimBlock, float>();
@@ -71,12 +72,12 @@ namespace TSUT.HeatManagement
                     if (behavior != null && behavior is HeatPipeManager)
                     {
                         var network = behavior as HeatPipeManager;
-                        if (HeatPipeManagerFactory.IsPipeConnectedToBlock(neighbor.FatBlock, _thruster)){
+                        if (HeatPipeManagerFactory.IsPipeConnectedToBlock(neighbor.FatBlock, _exhaust)){
                             if (!connectedPipeNetworks.Contains(network))
                             {
                                 connectedPipeNetworks.Add(network);
                             }
-                            neighborWithChange[neighbor] = network.GetHeatExchange(neighbor.FatBlock, _thruster, 1) / capacity;
+                            neighborWithChange[neighbor] = network.GetHeatExchange(neighbor.FatBlock, _exhaust, 1) / capacity;
                             cumulativeNetworkHeatChange += neighborWithChange[neighbor];
                         } else {
                             insulatedNeihbors.Add(neighbor);
@@ -84,22 +85,30 @@ namespace TSUT.HeatManagement
                     }
                     else
                     {
-                        neighborWithChange[neighbor] = HeatSession.Api.Utils.GetExchangeWithNeighbor(_thruster, neighbor.FatBlock, 1); // Assuming deltaTime of 1 second for display purposes
+                        neighborWithChange[neighbor] = HeatSession.Api.Utils.GetExchangeWithNeighbor(_exhaust, neighbor.FatBlock, 1); // Assuming deltaTime of 1 second for display purposes
                         cumulativeNeighborHeatChange += neighborWithChange[neighbor];
                     }
                 }
             }
+            float airDensity = HeatSession.Api.Utils.GetAirDensity(_exhaust);
 
             builder.AppendLine($"--- Heat Management ---");
             builder.AppendLine($"Temperature: {heat:F2} °C");
             builder.AppendLine($"Air Heat Change: {GetHeatChange(1):F2} °C/s");
-            string exchangeMode = outputRatio > 0f ? "Active" : "Passive";
+            string exchangeMode = _exhaust.IsFunctional && _exhaust.IsWorking ? "Active" : "Passive";
             builder.AppendLine($"Exchange Mode: {exchangeMode}");
             builder.AppendLine($"Thermal Capacity: {capacity / 1000000:F1} MJ/°C");
-            builder.AppendLine($"Thrust output: {outputRatio * 100:F1} %");
             builder.AppendLine($"Ambient temp: {ambient:F1} °C");
-            float windSpeed = HeatSession.Api.Utils.GetBlockWindSpeed(block);
-            builder.AppendLine($"Wind Speed: {windSpeed:F2} m/s");if (neighborList.Count > 0)
+            builder.AppendLine($"Air density: {airDensity * 100:F1} %");
+            builder.AppendLine($"------");
+            builder.AppendLine("");
+            builder.AppendLine("Heat Sources:");
+            builder.AppendLine($"  Exhaust: {HeatSession.Api.Utils.GetActiveExhaustHeatLoss(_exhaust, 1):+0.00;-0.00;0.00} °C/s");
+            builder.AppendLine($"  Air Exchange: {HeatSession.Api.Utils.GetAmbientHeatLoss(_exhaust, 1):+0.00;-0.00;0.00} °C/s");
+            builder.AppendLine($"  Neighbor Block: {cumulativeNeighborHeatChange:+0.00;-0.00;0.00} °C/s");
+            builder.AppendLine($"  Heat pipes: {cumulativeNetworkHeatChange:+0.00;-0.00;0.00} °C/s");
+
+            if (neighborList.Count > 0)
             {
                 builder.AppendLine("");
                 builder.AppendLine($"Neighbors:");
@@ -112,7 +121,8 @@ namespace TSUT.HeatManagement
                             builder.AppendLine($"- {neighborBlock.DisplayNameText} ({HeatSession.Api.Utils.GetHeat(neighborBlock):F2}°C) -> {neighborWithChange[neighbor]:F4} °C/s");
                         } else {
                             builder.AppendLine($"- {neighborBlock.DisplayNameText} ({HeatSession.Api.Utils.GetHeat(neighborBlock):F2}°C) !! Insulated");
-                        }                    }
+                        }  
+                    }
                 }
             }
             if (connectedPipeNetworks.Count > 0)
@@ -129,37 +139,38 @@ namespace TSUT.HeatManagement
 
         public float GetHeatChange(float deltaTime)
         {
-            if (_thruster == null)
+            if (_exhaust == null)
                 return 0f;
 
-            float change = HeatSession.Api.Utils.GetAmbientHeatLoss(_thruster, deltaTime);
-            float thrustRatio = (_thruster.MaxThrust > 0f) ? (_thruster.CurrentThrust / _thruster.MaxThrust) : 0f;
+            float change = HeatSession.Api.Utils.GetAmbientHeatLoss(_exhaust, deltaTime);
 
-            if (_thruster.IsFunctional && _thruster.Enabled && thrustRatio > 0f)
+            // You may want to implement a custom method for exhausts here
+            if (_exhaust.IsFunctional && _exhaust.Enabled)
             {
-                change = HeatSession.Api.Utils.GetActiveThrusterHeatLoss(_thruster, thrustRatio, deltaTime);
+                change = HeatSession.Api.Utils.GetActiveExhaustHeatLoss(_exhaust, deltaTime);
             }
             return -change;
         }
 
         public void Cleanup()
         {
-            if (_thruster != null)
+            if (_exhaust != null)
             {
-                _thruster.AppendingCustomInfo -= AppendThrusterHeatInfo;
-                _thruster = null;
+                _exhaust.AppendingCustomInfo -= AppendExhaustHeatInfo;
+                _exhaust = null;
             }
         }
 
         public void SpreadHeat(float deltaTime)
         {
-            return; // Thrusters do not spread heat in this implementation
+            // Exhausts do not spread heat in this implementation
+            return;
         }
 
         public void ReactOnNewHeat(float heat)
         {
-            this._thruster.RefreshCustomInfo();
-            return; // No specific reaction needed for thrusters
+            this._exhaust.RefreshCustomInfo();
+            return; // No specific reaction needed for exhausts
         }
     }
-}
+} 

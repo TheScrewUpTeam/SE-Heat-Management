@@ -4,16 +4,14 @@ using Sandbox.Definitions;
 using Sandbox.Game;
 using Sandbox.Game.Entities;
 using Sandbox.Game.EntityComponents;
-using Sandbox.Game.World;
 using Sandbox.ModAPI;
 using SpaceEngineers.Game.ModAPI;
 using VRage.Game.ModAPI;
-using VRage.Utils;
 using VRageMath;
 
 namespace TSUT.HeatManagement
 {
-    public class HeatUtils: IHeatUtils
+    public class HeatUtils : IHeatUtils
     {
         public readonly Guid HeatKey = new Guid("decafbad-0000-4c00-babe-c0ffee000001");
 
@@ -86,11 +84,13 @@ namespace TSUT.HeatManagement
                 block.Storage = new MyModStorageComponent();
             }
 
-            if (float.IsNaN(heat) || float.IsInfinity(heat)){
+            if (float.IsNaN(heat) || float.IsInfinity(heat))
+            {
                 MyAPIGateway.Utilities.ShowNotification($"Wrong heat value for {block.DisplayNameText}: {heat}", 1000);
             }
             block.Storage[HeatKey] = heat.ToString();
-            if (!silent) {
+            if (!silent)
+            {
                 SendHeatToClients(block, heat);
             }
         }
@@ -202,7 +202,10 @@ namespace TSUT.HeatManagement
                 return 20f;
             }
 
-            return GetTemperatureOnPlanet(position);
+
+            var worldPos = block.CubeGrid.GridIntegerToWorld(block.Position);
+
+            return GetTemperatureOnPlanet(worldPos);
         }
 
         public float GetWindSpeed(Vector3D position)
@@ -228,6 +231,17 @@ namespace TSUT.HeatManagement
             return GetWindSpeed(block.GetPosition()) + GetGridSpeed(block);
         }
 
+        public float GetAirDensity(IMyCubeBlock block)
+        {
+            var worldPos = block.CubeGrid.GridIntegerToWorld(block.Position);
+            var planet = MyGamePruningStructure.GetClosestPlanet(worldPos);
+            if (planet == null)
+            {
+                return 0;
+            }
+            return planet.GetAirDensity(worldPos);
+        }
+
         public float GetTemperatureOnPlanet(Vector3D position)
         {
             float ambientTemp = -180f; // Ambient space temperature
@@ -246,8 +260,8 @@ namespace TSUT.HeatManagement
 
             // Sunlight effect
             float fullDayNightTempSwing = 90f;
-            float airDensity = planet.GetOxygenForPosition(position); // Based on oxygen, because GetDensity is broken
-            float swingMultiplier = 1 - airDensity; // 0 at 100% oxygen, 1 at 0% oxygen
+            float airDensity = planet.GetAirDensity(position);
+            float swingMultiplier = 1 - airDensity;
             Vector3 sunDirection = MyVisualScriptLogicProvider.GetSunDirection(); // Already normalized
             Vector3D gravityDirection = -planet.Components.Get<MyGravityProviderComponent>().GetWorldGravityNormalized(position);
             float dot = (float)Vector3D.Dot(gravityDirection, sunDirection); // dot of up and sun direction
@@ -344,17 +358,29 @@ namespace TSUT.HeatManagement
             var currentHeat = GetHeat(block);
             var thermalCapacity = GetThermalCapacity(block);
             var surfaceArea = GetRealSurfaceArea(block);
+            var airDensity = GetAirDensity(block);
 
-            float energyLoss = (currentHeat - ambientTemp) * surfaceArea * Config.Instance.HEAT_COOLDOWN_COEFF * deltaTime;
+            float energyLoss = 0;
+            if (airDensity > 0)
+            {
+                // If there are atmo aroung - just exchange heat with it
+                energyLoss = (currentHeat - ambientTemp) * surfaceArea * Config.Instance.HEAT_COOLDOWN_COEFF * deltaTime;
+            }
+            else
+            {
+                // If in space - radiate at least something
+                energyLoss = surfaceArea * Config.Instance.HEAT_RADIATION_COEFF * deltaTime;
+            }
             float heatLoss = energyLoss / thermalCapacity; // °C lost
 
             return heatLoss;
         }
+
         public float GetActiveVentHealLoss(IMyAirVent vent, float deltaTime)
         {
             float currentTemp = GetHeat(vent);
             float ambientTemp = CalculateAmbientTemperature(vent) - 2f; // 2 degrees lower than ambient to simulate cooling effect
-            float airDensity = vent.GetOxygenLevel();
+            float airDensity = GetAirDensity(vent);
             float coolingPower = Config.Instance.VENT_COOLING_RATE * airDensity;
 
             float tempDiff = currentTemp - ambientTemp;
@@ -362,6 +388,56 @@ namespace TSUT.HeatManagement
             float heatRemoved = coolingPower * deltaTime * tempDiff / GetThermalCapacity(vent); // Joules removed
 
             return heatRemoved;
+        }
+
+        public float GetActiveHeatVentLoss(IMyHeatVent vent, float deltaTime)
+        {
+            float airDensity = GetAirDensity(vent);
+            float currentTemp = GetHeat(vent);
+            float ambientTemp = CalculateAmbientTemperature(vent) - 2f; // 2 degrees lower than ambient to simulate cooling effect
+            float coolingPower = Config.Instance.VENT_COOLING_RATE * airDensity;
+
+            float tempDiff = currentTemp - ambientTemp;
+
+            float heatRemoved = coolingPower * deltaTime * tempDiff / GetThermalCapacity(vent); // Joules removed
+
+            return heatRemoved;
+        }
+
+        public float GetExchangeWithNeighbor(IMyCubeBlock block, IMyCubeBlock neighbor, float deltaTime)
+        {
+            if (neighbor == null || block == null)
+                return 0f;
+
+            float tempA = HeatSession.Api.Utils.GetHeat(block);
+            float tempB = HeatSession.Api.Utils.GetHeat(neighbor);
+            float capacityA = HeatSession.Api.Utils.GetThermalCapacity(block);
+
+            float tempDiff = tempA - tempB;
+            float contactArea = HeatSession.Api.Utils.GetLargestFaceArea(neighbor.SlimBlock);
+            float energyTransferred = tempDiff * Config.Instance.THERMAL_CONDUCTIVITY * contactArea * deltaTime; // Arbitrary scaling factor for transfer rate
+
+            float deltaA = -energyTransferred / capacityA;
+
+            return deltaA;
+        }
+
+        public float GetActiveExhaustHeatLoss(IMyExhaustBlock exhaust, float deltaTime)
+        {
+            float baseRate = Config.Instance.EXHAUST_HEAT_REJECTION_RATE; // Rename to be exhaust-specific
+
+            float currentTemp = GetHeat(exhaust);
+            float ambientTemp = CalculateAmbientTemperature(exhaust);
+            float deltaT = currentTemp - ambientTemp;
+
+            // Base effectiveness modifier simulates diminishing return at very high delta-T (IRL heat rejection efficiency flattens)
+            float efficiencyFactor = 1f - (float)Math.Exp(-deltaT / 100f); // Adjustable curve
+
+            // Space exhausts still work, but slightly less effectively due to lack of convective medium
+            float atmosphericFactor = MathHelper.Clamp(GetAirDensity(exhaust), 0.5f, 1f);
+
+            float totalJoulesRemoved = deltaT * baseRate * efficiencyFactor * atmosphericFactor * deltaTime;
+            return totalJoulesRemoved / GetThermalCapacity(exhaust); // Return °C/sec
         }
 
         public float GetActiveThrusterHeatLoss(IMyThrust thruster, float thrustRatio, float deltaTime)
