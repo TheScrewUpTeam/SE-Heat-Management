@@ -1,13 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
-using ParallelTasks;
 using Sandbox.ModAPI;
-using SpaceEngineers.Game.ModAPI;
-using VRage.Audio;
 using VRage.Game;
 using VRage.Game.ModAPI;
-using VRage.Utils;
 using VRageMath;
 
 namespace TSUT.HeatManagement

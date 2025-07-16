@@ -4,11 +4,9 @@ using Sandbox.Definitions;
 using Sandbox.Game;
 using Sandbox.Game.Entities;
 using Sandbox.Game.EntityComponents;
-using Sandbox.Game.World;
 using Sandbox.ModAPI;
 using SpaceEngineers.Game.ModAPI;
 using VRage.Game.ModAPI;
-using VRage.Utils;
 using VRageMath;
 
 namespace TSUT.HeatManagement

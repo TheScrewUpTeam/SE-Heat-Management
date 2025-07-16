@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Text;
 using Sandbox.ModAPI;
 using VRage.Game.ModAPI;
-using SpaceEngineers.Game.ModAPI;
 
 namespace TSUT.HeatManagement
 {

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using Sandbox.ModAPI;
 using VRage.Game;
 using VRage.Game.ModAPI;
 using VRage.Utils;
@@ -110,7 +109,6 @@ namespace TSUT.HeatManagement
             // 4. Attempt to connect each node to its direct neighbors
             foreach (var node in blockToNode.Values)
             {
-                // MyLog.Default.WriteLine($"[HeatManagement] Processing {node.Block.DisplayNameText}...");
                 var pos = node.Block.Position;
 
                 foreach (var offset in Base6Directions.IntDirections)
@@ -122,12 +120,8 @@ namespace TSUT.HeatManagement
 
                     var neighborNode = blockToNode[neighborBlock];
 
-                    // MyLog.Default.WriteLine($"[HeatManagement] Found neighbor: {neighborNode.Block.DisplayNameText}...");
-
                     if (!ArePipesConnectedByGeometry(node.Block, neighborBlock))
                         continue;
-
-                    // MyLog.Default.WriteLine($"[HeatManagement] Geometry check: pass...");
 
                     // 5. Try adding this connection to an existing manager
                     bool connected = false;
@@ -139,8 +133,6 @@ namespace TSUT.HeatManagement
                             break;
                         }
                     }
-
-                    // MyLog.Default.WriteLine($"[HeatManagement] Is connected? {connected}...");
 
 
                     // 6. If no one accepted, make new manager
