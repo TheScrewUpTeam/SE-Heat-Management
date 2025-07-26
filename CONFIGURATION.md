@@ -6,9 +6,11 @@ This document explains each configuration variable available in the mod, helping
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `HEAT_COOLDOWN_COEFF` | float | 20.0 | **Heat cooldown coefficient.** Controls how quickly heat dissipates from blocks. Increase for faster cooling, decrease for slower cooling. |
+| `HEAT_COOLDOWN_COEFF` | float | 20.0 | **Heat cooldown coefficient.** Controls how quickly heat dissipates from blocks into the atmosphere. Increase for faster cooling, decrease for slower cooling. |
+| `HEAT_RADIATION_COEFF` | float | 5.0 | **Heat radiation coefficient.** Controls how much heat is radiated into space from blocks. Higher values mean more heat is lost to space. |
 | `DISCHARGE_HEAT_FRACTION` | float | 0.20 | **Discharge heat fraction.** The fraction of energy discharged from batteries that is converted into heat. Raise to make batteries generate more heat per discharge. |
 | `THERMAL_CONDUCTIVITY` | float | 200.0 | **Thermal conductivity.** Governs how efficiently heat spreads between connected blocks. Higher values mean heat equalizes faster across the grid. |
+| `HEATPIPE_CONDUCTIVITY` | float | 2000.0 | **Heat pipe conductivity.** Controls how efficiently heat pipes transfer heat between connected blocks. Higher values mean heat pipes are more effective at heat transfer. |
 | `VENT_COOLING_RATE` | float | 1000.0 | **Vent cooling rate.** The amount of heat removed per tick by a vent. Increase to make vents more effective at cooling. |
 | `THRUSTER_COOLING_RATE` | float | 25000.0 | **Thruster cooling rate.** The amount of heat removed per tick by thrusters. Increase to make thrusters more effective at cooling themselves. |
 | `CRITICAL_TEMP` | float | 150.0 | **Critical temperature.** The temperature at which heat source blocks are considered overheated and may explode. |
