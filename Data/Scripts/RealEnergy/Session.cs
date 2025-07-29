@@ -5,8 +5,9 @@ using VRage.ModAPI;
 using System.Collections.Generic;
 using VRage.Game;
 using VRage.Utils;
-using SpaceEngineers.Game.ModAPI;
 using Sandbox.ModAPI.Interfaces.Terminal;
+using System.Linq;
+
 
 namespace TSUT.HeatManagement
 {
@@ -36,7 +37,6 @@ namespace TSUT.HeatManagement
         private int _lastMainUpdateTick = 0;
 
         private static Dictionary<long, IHeatBehavior> _trackedNetworkBlocks = new Dictionary<long, IHeatBehavior>();
-        private static Dictionary<IMyCubeGrid, IGridHeatManager> _trachecdGrids = new Dictionary<IMyCubeGrid, IGridHeatManager>();
 
         public static Config Config;
 
@@ -44,10 +44,10 @@ namespace TSUT.HeatManagement
 
         public override void LoadData()
         {
-            if (!MyAPIGateway.Multiplayer.IsServer)
-            {
-                return;
-            }
+            // if (!MyAPIGateway.Multiplayer.IsServer)
+            // {
+            //     return;
+            // }
 
             // Load config (will use defaults if file doesn't exist)
             Config = Config.Instance;
@@ -203,15 +203,16 @@ namespace TSUT.HeatManagement
 
         public override void UpdateBeforeSimulation()
         {
-            if (!MyAPIGateway.Multiplayer.IsServer)
-                return;
-
             _heatApi.Effects.UpdateLightsPosition();
 
             foreach (var manager in _gridHeatManagers.Values)
             {
                 manager.UpdateVisuals(MyEngineConstants.UPDATE_STEP_SIZE_IN_SECONDS);
             }
+            _tickCount++;
+
+            if (!MyAPIGateway.Multiplayer.IsServer)
+                return;
 
             if (_tickCount % MAIN_UPDATE_INTERVAL == 0)
             {
@@ -237,7 +238,6 @@ namespace TSUT.HeatManagement
                 }
                 _lastNeighborsUpdateTick = _tickCount;
             }
-            _tickCount++;
         }
 
         public override void SaveData()
@@ -270,15 +270,6 @@ namespace TSUT.HeatManagement
             }
         }
 
-        internal static IGridHeatManager GetGridHeatManager(IMyCubeGrid grid)
-        {
-            if (!_trachecdGrids.ContainsKey(grid))
-            {
-                _trachecdGrids[grid] = new GridHeatManager(grid, true);
-            }
-            return _trachecdGrids[grid];
-        }
-
         internal static void UpdateUI(long entityId, float heat)
         {
             IMyEntity ent;
@@ -288,41 +279,10 @@ namespace TSUT.HeatManagement
                 if (block != null)
                 {
                     _heatApi.Utils.SetHeat(block, heat, true);
-                    IHeatBehavior info;
-                    if (!_trackedNetworkBlocks.TryGetValue(entityId, out info))
-                    {
-                        if (block is IMyBatteryBlock)
-                        {
-                            var battery = block as IMyBatteryBlock;
-                            var gridManager = GetGridHeatManager(block.CubeGrid);
-                            info = new BatteryHeatManager(battery, gridManager);
-                            _trackedNetworkBlocks[entityId] = info;
+                    foreach(var gridManager in _gridHeatManagers.Values) {
+                        if (gridManager.TryReactOnHeat(block, heat)){
+                            return;
                         }
-                        if (block is IMyAirVent)
-                        {
-                            var vent = block as IMyAirVent;
-                            var gridManager = GetGridHeatManager(block.CubeGrid);
-                            info = new VentHeatManager(vent, gridManager);
-                            _trackedNetworkBlocks[entityId] = info;
-                        }
-                        if (block is IMyThrust)
-                        {
-                            var thrust = block as IMyThrust;
-                            var gridManager = GetGridHeatManager(block.CubeGrid);
-                            info = new ThrusterHeatManager(thrust, gridManager);
-                            _trackedNetworkBlocks[entityId] = info;
-                        }
-                        if (block is IMyHeatVent)
-                        {
-                            var vent = block as IMyHeatVent;
-                            var gridManager = GetGridHeatManager(block.CubeGrid);
-                            info = new HeatVentManager(vent, gridManager);
-                            _trackedNetworkBlocks[entityId] = info;
-                        }
-                    }
-                    else
-                    {
-                        info.ReactOnNewHeat(heat);
                     }
                 }
             }
@@ -330,33 +290,44 @@ namespace TSUT.HeatManagement
 
         public static void RegisterDebugControl()
         {
-            if (_initialized) return;
+            if (_initialized)
+                return;
+
             _initialized = true;
+
+            MyAPIGateway.TerminalControls.CustomControlGetter += OnCustomControlGetter;
+        }
+
+        private static void OnCustomControlGetter(IMyTerminalBlock block, List<IMyTerminalControl> controls)
+        {
+            if (!(block is IMyBatteryBlock))
+                return;
+
+            // Only add if it doesn't already exist
+            if (controls.Any(c => c.Id == "ShowHeatNetworks"))
+                return;
 
             var checkbox = MyAPIGateway.TerminalControls.CreateControl<IMyTerminalControlCheckbox, IMyBatteryBlock>("ShowHeatNetworks");
             checkbox.Title = MyStringId.GetOrCompute("Show Heat Networks");
             checkbox.Tooltip = MyStringId.GetOrCompute("Visualizes all heat pipe connections on this grid.");
             checkbox.SupportsMultipleBlocks = false;
 
-            checkbox.Getter = block =>
+            checkbox.Getter = b =>
             {
                 GridHeatManager gridManager;
-                if (HeatSession._gridHeatManagers.TryGetValue(block.CubeGrid, out gridManager))
-                {
+                if (HeatSession._gridHeatManagers.TryGetValue(b.CubeGrid, out gridManager))
                     return gridManager.GetShowDebug();
-                }
                 return false;
             };
-            checkbox.Setter = (block, value) =>
+
+            checkbox.Setter = (b, value) =>
             {
                 GridHeatManager gridManager;
-                if (HeatSession._gridHeatManagers.TryGetValue(block.CubeGrid, out gridManager))
-                {
+                if (HeatSession._gridHeatManagers.TryGetValue(b.CubeGrid, out gridManager))
                     gridManager.SetShowDebug(value);
-                }
             };
 
-            MyAPIGateway.TerminalControls.AddControl<IMyBatteryBlock>(checkbox);
+            controls.Add(checkbox);
         }
     }
 }

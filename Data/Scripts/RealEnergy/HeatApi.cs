@@ -17,6 +17,7 @@ namespace TSUT.HeatManagement
         List<HeatPipeManager> GetHeatPipeManagers();
         void SetShowDebug(bool flag);
         bool GetShowDebug();
+        bool TryReactOnHeat(IMyCubeBlock block, float heat);
     }
 
     public interface IHeatBehavior

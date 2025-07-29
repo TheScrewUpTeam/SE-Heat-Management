@@ -217,6 +217,17 @@ namespace TSUT.HeatManagement
                 }
             }
         }
+
+        public bool TryReactOnHeat(IMyCubeBlock block, float heat)
+        {
+            IHeatBehavior behavior;
+            if (_heatBehaviors.TryGetValue(block, out behavior))
+            {
+                behavior.ReactOnNewHeat(heat);
+                return true;
+            }
+            return false;
+        }
     }
 
     public class HeatBehaviorAttachResult
