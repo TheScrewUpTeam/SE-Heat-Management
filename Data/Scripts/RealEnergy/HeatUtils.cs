@@ -6,6 +6,7 @@ using Sandbox.Game.Entities;
 using Sandbox.Game.EntityComponents;
 using Sandbox.ModAPI;
 using SpaceEngineers.Game.ModAPI;
+using VRage.Game;
 using VRage.Game.ModAPI;
 using VRageMath;
 
@@ -253,10 +254,24 @@ namespace TSUT.HeatManagement
                 return ambientTemp;
             }
 
-            // Altitude-based temperature calculation
-            float altitude = (float)(position - planet.PositionComp.WorldAABB.Center).Length() - (float)planet.AverageRadius;
-            float normalizedAlt = MathHelper.Clamp(altitude / 10000f, 0f, 1f);
-            ambientTemp = MathHelper.Lerp(25f, -50f, normalizedAlt);
+            MyTemperatureLevel minTemperature = planet.Generator.DefaultSurfaceTemperature;
+            switch (minTemperature) {
+                case MyTemperatureLevel.ExtremeFreeze:
+                    ambientTemp = -100.15f;
+                    break;
+                case MyTemperatureLevel.Freeze:
+                    ambientTemp = -40f;
+                    break;
+                case MyTemperatureLevel.Cozy:
+                    ambientTemp = 20f;
+                    break;
+                case MyTemperatureLevel.Hot:
+                    ambientTemp = 75f;
+                    break;
+                case MyTemperatureLevel.ExtremeHot:
+                    ambientTemp = 250f;
+                    break;
+            }
 
             // Sunlight effect
             float fullDayNightTempSwing = 90f;
