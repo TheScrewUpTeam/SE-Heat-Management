@@ -6,6 +6,10 @@ namespace TSUT.HeatManagement
     public class Config
     {
         public static ushort HeatSyncMessageId = 7949; // Choose any unused ushort value
+
+        public static ushort BlockHeatEventUniqueId = 17949; // Unique ID for block heat events
+        public static ushort GridHeatEventUniqueId = 27949; // Unique ID for block heat events
+
         public static string HeatDebugString = "HeatDebug";
 
         public float HEAT_COOLDOWN_COEFF { get; set; } = 20f;

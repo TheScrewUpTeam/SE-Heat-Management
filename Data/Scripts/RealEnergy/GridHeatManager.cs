@@ -228,6 +228,32 @@ namespace TSUT.HeatManagement
             }
             return false;
         }
+
+        internal bool TryGetBehaviorForBlock(IMyCubeBlock block, out IHeatBehavior behavior)
+        {
+            if (block == null)
+            {
+                behavior = null;
+                return false;
+            }
+
+            return _heatBehaviors.TryGetValue(block, out behavior);
+        }
+
+        internal float GetMaxTemperature()
+        {
+            float maxTemp = float.MinValue;
+            foreach (var kvp in _heatBehaviors)
+            {
+                IMyCubeBlock block = kvp.Key;
+                float temp = HeatSession.Api.Utils.GetHeat(block);
+                if (temp > maxTemp)
+                {
+                    maxTemp = temp;
+                }
+            }
+            return maxTemp;
+        }
     }
 
     public class HeatBehaviorAttachResult

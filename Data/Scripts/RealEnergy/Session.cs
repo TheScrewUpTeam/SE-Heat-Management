@@ -7,6 +7,7 @@ using VRage.Game;
 using VRage.Utils;
 using Sandbox.ModAPI.Interfaces.Terminal;
 using System.Linq;
+using System;
 
 
 namespace TSUT.HeatManagement
@@ -61,6 +62,26 @@ namespace TSUT.HeatManagement
             _heatApi.Registry.RegisterHeatBehaviorFactory(new ThrusterHeatManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new HeatPipeManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new HeatVentManagerFactory());
+        }
+
+        public static IHeatBehavior GetBehaviorForBlock(IMyCubeBlock block)
+        {
+            if (block == null)
+                return null;
+
+            IHeatBehavior behavior;
+            if (_trackedNetworkBlocks.TryGetValue(block.EntityId, out behavior))
+            {
+                return behavior;
+            }
+
+            GridHeatManager manager;
+            if (_gridHeatManagers.TryGetValue(block.CubeGrid, out manager))
+            {
+                manager.TryGetBehaviorForBlock(block, out behavior);
+            }
+
+            return behavior;
         }
 
         protected override void UnloadData()
@@ -237,6 +258,22 @@ namespace TSUT.HeatManagement
                     manager.UpdateNeighborsTemp(passedTime);
                 }
                 _lastNeighborsUpdateTick = _tickCount;
+
+                // Notify all event controller events
+                MyLog.Default.WriteLine($"[HeatManagement] Notifying all {_heatApi.Registry.GetEventControllerEvents().Count} event controller events");
+                foreach (var eventControllerEvent in _heatApi.Registry.GetEventControllerEvents())
+                {
+                    if (eventControllerEvent != null && eventControllerEvent is BlockTemperatureChanged)
+                    {
+                        var heatEvent = eventControllerEvent as BlockTemperatureChanged;
+                        heatEvent.NotifyValuesChanged();
+                    }
+                    else if (eventControllerEvent != null && eventControllerEvent is GridMaxTemperatureChanged)
+                    {
+                        var heatEvent = eventControllerEvent as GridMaxTemperatureChanged;
+                        heatEvent.NotifyValuesChanged();
+                    }
+                }
             }
         }
 
@@ -298,6 +335,15 @@ namespace TSUT.HeatManagement
             MyAPIGateway.TerminalControls.CustomControlGetter += OnCustomControlGetter;
         }
 
+        public static void GetGridHeatManager(IMyCubeGrid grid, out GridHeatManager manager)
+        {
+            if (_gridHeatManagers.TryGetValue(grid, out manager))
+                return;
+
+            manager = new GridHeatManager(grid);
+            _gridHeatManagers[grid] = manager;
+        }
+
         private static void OnCustomControlGetter(IMyTerminalBlock block, List<IMyTerminalControl> controls)
         {
             if (!(block is IMyBatteryBlock))
@@ -315,7 +361,7 @@ namespace TSUT.HeatManagement
             checkbox.Getter = b =>
             {
                 GridHeatManager gridManager;
-                if (HeatSession._gridHeatManagers.TryGetValue(b.CubeGrid, out gridManager))
+                if (_gridHeatManagers.TryGetValue(b.CubeGrid, out gridManager))
                     return gridManager.GetShowDebug();
                 return false;
             };
@@ -323,7 +369,7 @@ namespace TSUT.HeatManagement
             checkbox.Setter = (b, value) =>
             {
                 GridHeatManager gridManager;
-                if (HeatSession._gridHeatManagers.TryGetValue(b.CubeGrid, out gridManager))
+                if (_gridHeatManagers.TryGetValue(b.CubeGrid, out gridManager))
                     gridManager.SetShowDebug(value);
             };
 
