@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using VRage.Game.ModAPI;
 using VRage.Utils;
 using System.Linq;
+using System.Reflection;
 
 namespace TSUT.HeatManagement
 {
@@ -27,6 +28,35 @@ namespace TSUT.HeatManagement
                 catch (Exception ex)
                 {
                     MyLog.Default.WriteLine($"[HeatManagement] Factory {factory.GetType().Name} threw exception on collect behaviors: {ex}");
+                }
+            }
+
+            var providers = HeatSession.Api.Registry.GetHeatBehaviorProviders().ToList();
+            foreach (var provider in providers)
+            {
+                if (provider == null)
+                    continue;
+
+                try
+                {
+                    var methodInfo = provider.GetType().GetMethod("ProvideBehaviors");
+                    if (methodInfo != null)
+                    {
+                        List<object> behaviors = methodInfo.Invoke(provider, new object[] { grid });
+                        // var behaviors = provider.ProvideBehaviors(grid);
+                        MyLog.Default.WriteLine($"[HeatManagement] HeatBehaviorProvider provided {behaviors.Count} behaviors for grid {grid.DisplayName}");
+                        // foreach (var kvp in behaviors)
+                        // {
+                        //     if (kvp.Value != null && !_heatBehaviors.ContainsKey(kvp.Key))
+                        //     {
+                        //         _heatBehaviors[kvp.Key] = new DelegateHeatBehavior(kvp.Value);
+                        //     }
+                        // }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MyLog.Default.WriteLine($"[HeatManagement] Provider {provider.GetType().Name} threw exception on provide behaviors: {ex}");
                 }
             }
 
@@ -260,5 +290,66 @@ namespace TSUT.HeatManagement
     {
         public IHeatBehavior Behavior;
         public List<IMyCubeBlock> AffectedBlocks = new List<IMyCubeBlock>();
+    }
+
+    // public class DelegateHeatBehavior : IHeatBehavior
+    // {
+    //     private readonly ShareableApi.HeatBehaviorLogic _logic;
+
+    //     public DelegateHeatBehavior(ShareableApi.HeatBehaviorLogic logic)
+    //     {
+    //         _logic = logic;
+    //     }
+
+    //     public float GetHeatChange(float deltaTime) => _logic.GetHeatChange?.Invoke(deltaTime) ?? 0f;
+    //     public void ReactOnNewHeat(float heat) => _logic.ReactOnNewHeat?.Invoke(heat);
+    //     public void SpreadHeat(float deltaTime) => _logic.SpreadHeat?.Invoke(deltaTime);
+    //     public void Cleanup() => _logic.Cleanup?.Invoke();
+    // }
+
+    public class DelegateHeatBehavior : IHeatBehavior
+    {
+        private readonly object _logic;
+
+        private readonly MethodInfo _getHeatChangeMethod;
+        private readonly MethodInfo _reactOnNewHeatMethod;
+        private readonly MethodInfo _spreadHeatMethod;
+        private readonly MethodInfo _cleanupMethod;
+
+        public DelegateHeatBehavior(object logic)
+        {
+            _logic = logic ?? throw new ArgumentNullException(nameof(logic));
+
+            var type = _logic.GetType();
+            _getHeatChangeMethod = type.GetMethod("GetHeatChange");
+            _reactOnNewHeatMethod = type.GetMethod("ReactOnNewHeat");
+            _spreadHeatMethod = type.GetMethod("SpreadHeat");
+            _cleanupMethod = type.GetMethod("Cleanup");
+        }
+
+        public float GetHeatChange(float deltaTime)
+        {
+            if (_getHeatChangeMethod == null) return 0f;
+
+            var result = _getHeatChangeMethod.Invoke(_logic, new object[] { deltaTime });
+            if (result is float f) return f;
+            if (result is double d) return (float)d;
+            return 0f;
+        }
+
+        public void ReactOnNewHeat(float heat)
+        {
+            _reactOnNewHeatMethod?.Invoke(_logic, new object[] { heat });
+        }
+
+        public void SpreadHeat(float deltaTime)
+        {
+            _spreadHeatMethod?.Invoke(_logic, new object[] { deltaTime });
+        }
+
+        public void Cleanup()
+        {
+            _cleanupMethod?.Invoke(_logic, null);
+        }
     }
 }

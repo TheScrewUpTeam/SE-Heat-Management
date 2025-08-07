@@ -49,6 +49,8 @@ namespace TSUT.HeatManagement
         void RegisterEventControllerEvent(IEventControllerEvent eventControllerEvent);
         IReadOnlyList<IEventControllerEvent> GetEventControllerEvents();
         void RemoveEventControllerEvent(IEventControllerEvent eventControllerEvent);
+        void RegisterHeatBehaviorProvider(object provider);
+        IEnumerable<object> GetHeatBehaviorProviders();
     }
 
     public interface IHeatUtils

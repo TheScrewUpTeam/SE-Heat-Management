@@ -16,8 +16,6 @@ namespace TSUT.HeatManagement
     [MySessionComponentDescriptor(MyUpdateOrder.BeforeSimulation)]
     public class HeatSession : MySessionComponentBase
     {
-        private static readonly long ApiModId = 3513670949; // Replace with your actual mod ID
-
         const int NEIGHBOT_UPDATE_INTERVAL = 100; // in ticks
         const int MAIN_UPDATE_INTERVAL = 30; // in ticks
 
@@ -62,6 +60,25 @@ namespace TSUT.HeatManagement
             _heatApi.Registry.RegisterHeatBehaviorFactory(new ThrusterHeatManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new HeatPipeManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new HeatVentManagerFactory());
+
+            MyAPIGateway.Utilities.RegisterMessageHandler(ShareableApi.HeatProviderMesageId, OnHeatProviderRegister);
+            var shareable = ConvertApiToShareable(_heatApi);
+            MyAPIGateway.Utilities.SendModMessage(ShareableApi.HeatApiMessageId, shareable);
+            MyLog.Default.WriteLine($"[HeatManagement] HeatAPI populated");
+        }
+
+        private void OnHeatProviderRegister(object obj)
+        {
+            if (obj == null)
+            {
+                MyLog.Default.WriteLine($"[HeatManagement] Invalid heat provider registration: {obj?.GetType().FullName}");
+                return;
+            }
+
+            MyLog.Default.WriteLine($"[HeatManagement] Received heat provider registration {obj?.GetType().FullName}: {obj}");
+            MyLog.Default.WriteLine($"[HeatManagement] expected type: {typeof(ShareableApi.HeatBehaviorProvider).Name}");
+
+            _heatApi.Registry.RegisterHeatBehaviorProvider(obj);
         }
 
         public static IHeatBehavior GetBehaviorForBlock(IMyCubeBlock block)
@@ -87,14 +104,14 @@ namespace TSUT.HeatManagement
         protected override void UnloadData()
         {
             networking?.Unregister();
+            MyAPIGateway.Utilities.UnregisterMessageHandler(ShareableApi.HeatProviderMesageId, OnHeatProviderRegister);
         }
 
         public override void BeforeStart()
         {
             networking.Register();
             RegisterDebugControl();
-            // MyLog.Default.WriteLine($"[HeatManagement] HeatAPI populated"); // No grid context, cannot wrap
-            MyAPIGateway.Utilities.SendModMessage(ApiModId, _heatApi);
+            MyLog.Default.WriteLine($"[HeatManagement] HeatSession BeforeStart called");
 
             HashSet<IMyEntity> allEntities = new HashSet<IMyEntity>();
             MyAPIGateway.Entities.GetEntities(allEntities);
@@ -260,7 +277,6 @@ namespace TSUT.HeatManagement
                 _lastNeighborsUpdateTick = _tickCount;
 
                 // Notify all event controller events
-                MyLog.Default.WriteLine($"[HeatManagement] Notifying all {_heatApi.Registry.GetEventControllerEvents().Count} event controller events");
                 foreach (var eventControllerEvent in _heatApi.Registry.GetEventControllerEvents())
                 {
                     if (eventControllerEvent != null && eventControllerEvent is BlockTemperatureChanged)
@@ -316,8 +332,10 @@ namespace TSUT.HeatManagement
                 if (block != null)
                 {
                     _heatApi.Utils.SetHeat(block, heat, true);
-                    foreach(var gridManager in _gridHeatManagers.Values) {
-                        if (gridManager.TryReactOnHeat(block, heat)){
+                    foreach (var gridManager in _gridHeatManagers.Values)
+                    {
+                        if (gridManager.TryReactOnHeat(block, heat))
+                        {
                             return;
                         }
                     }
@@ -374,6 +392,47 @@ namespace TSUT.HeatManagement
             };
 
             controls.Add(checkbox);
+        }
+
+        private ShareableApi ConvertApiToShareable(HeatApi heatApi)
+        {
+            var api = new ShareableApi
+            {
+                Utils = new ShareableApi.HeatUtils
+                {
+                    CalculateAmbientTemperature = block =>  heatApi.Utils.CalculateAmbientTemperature(block),
+                    EstimateSpecificHeat = density => heatApi.Utils.EstimateSpecificHeat(density),
+                    GetActiveThrusterHeatLoss = (thruster, ratio, dt) => heatApi.Utils.GetActiveThrusterHeatLoss(thruster, ratio, dt),
+                    GetActiveVentHeatLoss = (vent, dt) => heatApi.Utils.GetActiveVentHealLoss(vent, dt),
+                    GetActiveHeatVentLoss = (vent, dt) => heatApi.Utils.GetActiveHeatVentLoss(vent, dt),
+                    GetAmbientHeatLoss = (block, dt) => heatApi.Utils.GetAmbientHeatLoss(block, dt),
+                    GetDensity = block => heatApi.Utils.GetDensity(block),
+                    GetHeat = block => heatApi.Utils.GetHeat(block),
+                    GetLargestFaceArea = slim => heatApi.Utils.GetLargestFaceArea(slim),
+                    GetMass = block => heatApi.Utils.GetMass(block),
+                    GetRealSurfaceArea = block => heatApi.Utils.GetRealSurfaceArea(block),
+                    GetSunDirection = (block, planet) => heatApi.Utils.GetSunDirection(block, planet),
+                    GetTemperatureOnPlanet = pos => heatApi.Utils.GetTemperatureOnPlanet(pos),
+                    GetThermalCapacity = block => heatApi.Utils.GetThermalCapacity(block),
+                    IsBlockInPressurizedRoom = block => heatApi.Utils.IsBlockInPressurizedRoom(block),
+                    PurgeCaches = () => heatApi.Utils.PurgeCaches(),
+                    SetHeat = (block, heat, silent) => heatApi.Utils.SetHeat(block, heat, silent),
+                    ApplyHeatChange = (block, heat) => heatApi.Utils.ApplyHeatChange(block, heat),
+                    GetBlockWindSpeed = block => heatApi.Utils.GetBlockWindSpeed(block),
+                    GetExchangeWithNeighbor = (block, neighbor, dt) => heatApi.Utils.GetExchangeWithNeighbor(block, neighbor, dt),
+                    GetAirDensity = block => heatApi.Utils.GetAirDensity(block),
+                    GetActiveExhaustHeatLoss = (exhaust, dt) => heatApi.Utils.GetActiveExhaustHeatLoss(exhaust, dt)
+                },
+                Effects = new ShareableApi.HeatEffects
+                {
+                    Cleanup = blocks => heatApi.Effects.Cleanup(blocks),
+                    InstantiateSmoke = block => heatApi.Effects.InstantiateSmoke(block),
+                    RemoveSmoke = block => heatApi.Effects.RemoveSmoke(block),
+                    UpdateBlockHeatLight = (block, heat) => heatApi.Effects.UpdateBlockHeatLight(block, heat),
+                    UpdateLightsPosition = () => heatApi.Effects.UpdateLightsPosition()
+                }
+            };
+            return api;
         }
     }
 }
