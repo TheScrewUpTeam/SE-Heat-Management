@@ -4,6 +4,8 @@ using VRage.Game.ModAPI;
 using VRage.Utils;
 using System.Linq;
 using System.Reflection;
+using Sandbox.ModAPI;
+using Sandbox.Game.Entities;
 
 namespace TSUT.HeatManagement
 {
@@ -27,10 +29,11 @@ namespace TSUT.HeatManagement
                 }
                 catch (Exception ex)
                 {
-                    MyLog.Default.WriteLine($"[HeatManagement] Factory {factory.GetType().Name} threw exception on collect behaviors: {ex}");
+                    MyLog.Default.Warning($"[HeatManagement] Factory {factory.GetType().Name} threw exception on collect behaviors: {ex}");
                 }
             }
 
+            var gridId = grid.EntityId;
             var providers = HeatSession.Api.Registry.GetHeatBehaviorProviders().ToList();
             foreach (var provider in providers)
             {
@@ -39,24 +42,23 @@ namespace TSUT.HeatManagement
 
                 try
                 {
-                    var methodInfo = provider.GetType().GetMethod("ProvideBehaviors");
-                    if (methodInfo != null)
+                    IDictionary<long, IDictionary<string, object>> behaviors = provider(gridId);
+                    foreach (var kvp in behaviors)
                     {
-                        List<object> behaviors = methodInfo.Invoke(provider, new object[] { grid });
-                        // var behaviors = provider.ProvideBehaviors(grid);
-                        MyLog.Default.WriteLine($"[HeatManagement] HeatBehaviorProvider provided {behaviors.Count} behaviors for grid {grid.DisplayName}");
-                        // foreach (var kvp in behaviors)
-                        // {
-                        //     if (kvp.Value != null && !_heatBehaviors.ContainsKey(kvp.Key))
-                        //     {
-                        //         _heatBehaviors[kvp.Key] = new DelegateHeatBehavior(kvp.Value);
-                        //     }
-                        // }
+                        var blockId = kvp.Key;
+                        var behavior = kvp.Value;
+                        if (behavior == null)
+                            continue;
+                        var block = MyAPIGateway.Entities.GetEntityById(blockId) as MyCubeBlock;
+                        if (block != null && !_heatBehaviors.ContainsKey(block))
+                        {
+                            _heatBehaviors[block] = new DelegateHeatBehavior(behavior);
+                        }
                     }
                 }
                 catch (Exception ex)
                 {
-                    MyLog.Default.WriteLine($"[HeatManagement] Provider {provider.GetType().Name} threw exception on provide behaviors: {ex}");
+                    MyLog.Default.Warning($"[HeatManagement] Provider {provider.GetType().Name} threw exception on provide behaviors: {ex}");
                 }
             }
 
@@ -113,7 +115,31 @@ namespace TSUT.HeatManagement
                 }
                 catch (Exception ex)
                 {
-                    MyLog.Default.WriteLine($"[HeatManagement] Factory {factory.GetType().Name} threw exception on block add: {ex}");
+                    MyLog.Default.Warning($"[HeatManagement] Factory {factory.GetType().Name} threw exception on block add: {ex}");
+                }
+            }
+
+            var mappers = HeatSession.Api.Registry.GetHeatMappers();
+            foreach (var mapper in mappers)
+            {
+                if (mapper == null)
+                    continue;
+                try
+                {
+                    var logic = mapper(block.FatBlock.EntityId);
+                    if (logic == null)
+                    {
+                        continue;
+                    }
+                    IHeatBehavior behavior = new DelegateHeatBehavior(logic);
+                    if (behavior != null)
+                    {
+                        _heatBehaviors[block.FatBlock] = behavior;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MyLog.Default.Warning($"[HeatManagement] Factory {mapper.GetType().Name} threw exception on block add: {ex}");
                 }
             }
             HeatSession.Api.Utils.PurgeCaches();
@@ -151,7 +177,7 @@ namespace TSUT.HeatManagement
                 }
                 catch (Exception ex)
                 {
-                    MyLog.Default.WriteLine($"[HeatManagement] Behavior {behavior.GetType().Name} threw exception on update: {ex}");
+                    MyLog.Default.Warning($"[HeatManagement] Behavior {behavior.GetType().Name} threw exception on update: {ex}");
                 }
             }
         }
@@ -177,7 +203,7 @@ namespace TSUT.HeatManagement
                 }
                 catch (Exception ex)
                 {
-                    MyLog.Default.WriteLine($"[HeatManagement] Behavior {behavior.GetType().Name} threw exception on spread heat: {ex}");
+                    MyLog.Default.Warning($"[HeatManagement] Behavior {behavior.GetType().Name} threw exception on spread heat: {ex}");
                 }
             }
         }
@@ -194,7 +220,7 @@ namespace TSUT.HeatManagement
                 }
                 catch (Exception ex)
                 {
-                    MyLog.Default.WriteLine($"[HeatManagement] Behavior {behavior.GetType().Name} threw exception on cleanup: {ex}");
+                    MyLog.Default.Warning($"[HeatManagement] Behavior {behavior.GetType().Name} threw exception on cleanup: {ex}");
                 }
             }
             _heatBehaviors.Clear();
@@ -292,64 +318,42 @@ namespace TSUT.HeatManagement
         public List<IMyCubeBlock> AffectedBlocks = new List<IMyCubeBlock>();
     }
 
-    // public class DelegateHeatBehavior : IHeatBehavior
-    // {
-    //     private readonly ShareableApi.HeatBehaviorLogic _logic;
-
-    //     public DelegateHeatBehavior(ShareableApi.HeatBehaviorLogic logic)
-    //     {
-    //         _logic = logic;
-    //     }
-
-    //     public float GetHeatChange(float deltaTime) => _logic.GetHeatChange?.Invoke(deltaTime) ?? 0f;
-    //     public void ReactOnNewHeat(float heat) => _logic.ReactOnNewHeat?.Invoke(heat);
-    //     public void SpreadHeat(float deltaTime) => _logic.SpreadHeat?.Invoke(deltaTime);
-    //     public void Cleanup() => _logic.Cleanup?.Invoke();
-    // }
-
     public class DelegateHeatBehavior : IHeatBehavior
     {
-        private readonly object _logic;
+        private readonly IDictionary<string, object> _logic;
 
-        private readonly MethodInfo _getHeatChangeMethod;
-        private readonly MethodInfo _reactOnNewHeatMethod;
-        private readonly MethodInfo _spreadHeatMethod;
-        private readonly MethodInfo _cleanupMethod;
-
-        public DelegateHeatBehavior(object logic)
+        public DelegateHeatBehavior(IDictionary<string, object> logic)
         {
-            _logic = logic ?? throw new ArgumentNullException(nameof(logic));
-
-            var type = _logic.GetType();
-            _getHeatChangeMethod = type.GetMethod("GetHeatChange");
-            _reactOnNewHeatMethod = type.GetMethod("ReactOnNewHeat");
-            _spreadHeatMethod = type.GetMethod("SpreadHeat");
-            _cleanupMethod = type.GetMethod("Cleanup");
+            _logic = logic;
         }
 
         public float GetHeatChange(float deltaTime)
         {
-            if (_getHeatChangeMethod == null) return 0f;
-
-            var result = _getHeatChangeMethod.Invoke(_logic, new object[] { deltaTime });
-            if (result is float f) return f;
-            if (result is double d) return (float)d;
+            object getHeatChange;
+            if (_logic != null && _logic.TryGetValue("GetHeatChange", out getHeatChange) && getHeatChange is Func<float, float>)
+                return (getHeatChange as Func<float, float>)(deltaTime);
             return 0f;
         }
 
         public void ReactOnNewHeat(float heat)
         {
-            _reactOnNewHeatMethod?.Invoke(_logic, new object[] { heat });
+            object reactOnNewHeat;
+            if (_logic != null && _logic.TryGetValue("ReactOnNewHeat", out reactOnNewHeat) && reactOnNewHeat is Action<float>)
+                (reactOnNewHeat as Action<float>)(heat);
         }
 
         public void SpreadHeat(float deltaTime)
         {
-            _spreadHeatMethod?.Invoke(_logic, new object[] { deltaTime });
+            object spreadHeat;
+            if (_logic != null && _logic.TryGetValue("SpreadHeat", out spreadHeat) && spreadHeat is Action<float>)
+                (spreadHeat as Action<float>)(deltaTime);
         }
 
         public void Cleanup()
         {
-            _cleanupMethod?.Invoke(_logic, null);
+            object cleanup;
+            if (_logic != null && _logic.TryGetValue("Cleanup", out cleanup) && cleanup is Action)
+                (cleanup as Action)();
         }
     }
 }

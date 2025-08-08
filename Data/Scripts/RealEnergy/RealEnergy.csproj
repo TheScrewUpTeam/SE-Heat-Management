@@ -69,6 +69,7 @@
     <Compile Include="Events\GridMaxTemperatureChanged.cs" />
     <Compile Include="Builders\ObjectBuilderHeat.cs" />
     <Compile Include="Builders\ObjectBuilderGridHeat.cs" />
+    <Compile Include="HmsApiV1.0.cs" />
     <Compile Include="Session.cs" />
   </ItemGroup>
   <ItemGroup>

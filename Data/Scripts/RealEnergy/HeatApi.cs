@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Sandbox.Game.Entities;
 using Sandbox.ModAPI;
@@ -49,8 +50,10 @@ namespace TSUT.HeatManagement
         void RegisterEventControllerEvent(IEventControllerEvent eventControllerEvent);
         IReadOnlyList<IEventControllerEvent> GetEventControllerEvents();
         void RemoveEventControllerEvent(IEventControllerEvent eventControllerEvent);
-        void RegisterHeatBehaviorProvider(object provider);
-        IEnumerable<object> GetHeatBehaviorProviders();
+        void RegisterHeatBehaviorProvider(Func<long, IDictionary<long, IDictionary<string, object>>> provider);
+        IEnumerable<Func<long, IDictionary<long, IDictionary<string, object>>>> GetHeatBehaviorProviders();
+        void RegisterHeatMapper(Func<long, IDictionary<string, object>> mapper);
+        IEnumerable<Func<long, IDictionary<string, object>>> GetHeatMappers();
     }
 
     public interface IHeatUtils
