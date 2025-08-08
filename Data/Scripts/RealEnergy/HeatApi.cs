@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Sandbox.Game.Entities;
 using Sandbox.ModAPI;
 using SpaceEngineers.Game.ModAPI;
+using SpaceEngineers.Game.VoiceChat;
 using VRage.Game.ModAPI;
 using VRageMath;
 

@@ -353,7 +353,6 @@ namespace TSUT.HeatManagement
 
             controls.Add(checkbox);
         }
-
         private Dictionary<string, object> ConvertApiToShareable(HeatApi heatApi)
         {
             return new Dictionary<string, object>
