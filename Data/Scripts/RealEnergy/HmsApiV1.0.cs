@@ -37,6 +37,21 @@ namespace TSUT.HeatManagement
             _onReady?.Invoke();
         }
 
+        /// <summary>
+        /// Registers a factory for creating custom heat behaviors for blocks on a grid.
+        /// </summary>
+        /// <param name="blockSelector">
+        ///   A function that receives a <see cref="MyCubeGrid"/> and returns a list of blocks (<see cref="IMyCubeBlock"/>)
+        ///   that should have custom heat behaviors. This is called once per grid when the heat system initializes or when a new grid is loaded.
+        ///   Use this to filter/select only the blocks you want to attach custom heat logic to.
+        /// </param>
+        /// <param name="behaviorCreator">
+        ///   A function that receives a block (<see cref="IMyCubeBlock"/>) and returns an instance of your custom <see cref="AHeatBehavior"/>.
+        ///   This is called for each block returned by <paramref name="blockSelector"/> to instantiate the heat behavior for that block.
+        ///   It is also called individually when a new block is added to the grid at runtime.
+        ///   Return <c>null</c> if you do not want to attach a behavior to a particular block.
+        ///   !!! IMPORTANT !!! Always check block to make sure that it's the block type you want
+        /// </param>
         public void RegisterHeatBehaviorFactory(
             Func<MyCubeGrid, List<IMyCubeBlock>> blockSelector,
             Func<IMyCubeBlock, AHeatBehavior> behaviorCreator
@@ -224,7 +239,7 @@ namespace TSUT.HeatManagement
             // }
 
             /// <summary>
-            /// Called every simulation tick to calculate the heat change for this block.
+            /// Called twice a second to calculate the heat change for this block.
             /// Return the amount of heat to add (positive) or remove (negative) for the given deltaTime.
             /// This is the main entry point for your custom heat logic.
             /// </summary>
@@ -233,7 +248,7 @@ namespace TSUT.HeatManagement
             abstract public float GetHeatChange(float deltaTime);
 
             /// <summary>
-            /// Called every simulation tick to allow this block to exchange heat with its neighbors.
+            /// Called every 1.5 second to allow this block to exchange heat with its neighbors.
             /// Use this to implement heat spreading or networked heat transfer.
             /// </summary>
             /// <param name="deltaTime">The time in seconds since the last update.</param>

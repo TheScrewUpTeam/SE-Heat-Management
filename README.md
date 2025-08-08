@@ -48,6 +48,16 @@ See the [Configuration Guide](CONFIGURATION.md) for detailed instructions on all
 
 ---
 
+# Extensibility
+
+This mod is now fully extensible! 3rd party developers can integrate their own heat logic, effects, and custom behaviors using the provided API.
+
+For a complete integration guide and examples, see [EXTENSIBILITY.md](./EXTENSIBILITY.md).
+
+If you are a modder and want to add your own heat behaviors or interact with the heat system, follow the instructions in that file.
+
+---
+
 ## Known Issues
 
 - Your ship may unexpectedly become a fireball. This is a feature, not a bug.

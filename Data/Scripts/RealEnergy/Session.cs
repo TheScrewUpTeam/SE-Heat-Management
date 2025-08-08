@@ -45,11 +45,6 @@ namespace TSUT.HeatManagement
 
         public override void LoadData()
         {
-            // if (!MyAPIGateway.Multiplayer.IsServer)
-            // {
-            //     return;
-            // }
-
             // Load config (will use defaults if file doesn't exist)
             Config = Config.Instance;
 
