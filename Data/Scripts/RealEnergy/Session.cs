@@ -7,6 +7,9 @@ using VRage.Game;
 using VRage.Utils;
 using Sandbox.ModAPI.Interfaces.Terminal;
 using System.Linq;
+using System;
+using SpaceEngineers.Game.ModAPI;
+using Sandbox.Game.Entities;
 
 
 namespace TSUT.HeatManagement
@@ -15,8 +18,6 @@ namespace TSUT.HeatManagement
     [MySessionComponentDescriptor(MyUpdateOrder.BeforeSimulation)]
     public class HeatSession : MySessionComponentBase
     {
-        private static readonly long ApiModId = 3513670949; // Replace with your actual mod ID
-
         const int NEIGHBOT_UPDATE_INTERVAL = 100; // in ticks
         const int MAIN_UPDATE_INTERVAL = 30; // in ticks
 
@@ -44,11 +45,6 @@ namespace TSUT.HeatManagement
 
         public override void LoadData()
         {
-            // if (!MyAPIGateway.Multiplayer.IsServer)
-            // {
-            //     return;
-            // }
-
             // Load config (will use defaults if file doesn't exist)
             Config = Config.Instance;
 
@@ -61,19 +57,59 @@ namespace TSUT.HeatManagement
             _heatApi.Registry.RegisterHeatBehaviorFactory(new ThrusterHeatManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new HeatPipeManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new HeatVentManagerFactory());
+
+            MyAPIGateway.Utilities.RegisterMessageHandler(ShareableApi.HeatProviderMesageId, OnHeatProviderRegister);
+            var shareable = ConvertApiToShareable(_heatApi);
+            MyAPIGateway.Utilities.SendModMessage(ShareableApi.HeatApiMessageId, shareable);
+            MyLog.Default.WriteLine($"[HeatManagement] HeatAPI populated");
+        }
+
+        private void OnHeatProviderRegister(object obj)
+        {
+            Dictionary<string, object> call = obj as Dictionary<string, object>;
+            object method;
+            if (call.TryGetValue("factory", out method) && method is Func<long, IDictionary<long, IDictionary<string, object>>>)
+            {
+                var factory = (Func<long, IDictionary<long, IDictionary<string, object>>>)method;
+                _heatApi.Registry.RegisterHeatBehaviorProvider(factory);
+            }
+            if (call.TryGetValue("creator", out method) && method is Func<long, IDictionary<string, object>>)
+            {
+                var mapper = (Func<long, IDictionary<string, object>>)method;
+                _heatApi.Registry.RegisterHeatMapper(mapper);
+            }
+        }
+
+        public static IHeatBehavior GetBehaviorForBlock(IMyCubeBlock block)
+        {
+            if (block == null)
+                return null;
+
+            IHeatBehavior behavior;
+            if (_trackedNetworkBlocks.TryGetValue(block.EntityId, out behavior))
+            {
+                return behavior;
+            }
+
+            GridHeatManager manager;
+            if (_gridHeatManagers.TryGetValue(block.CubeGrid, out manager))
+            {
+                manager.TryGetBehaviorForBlock(block, out behavior);
+            }
+
+            return behavior;
         }
 
         protected override void UnloadData()
         {
             networking?.Unregister();
+            MyAPIGateway.Utilities.UnregisterMessageHandler(ShareableApi.HeatProviderMesageId, OnHeatProviderRegister);
         }
 
         public override void BeforeStart()
         {
             networking.Register();
             RegisterDebugControl();
-            // MyLog.Default.WriteLine($"[HeatManagement] HeatAPI populated"); // No grid context, cannot wrap
-            MyAPIGateway.Utilities.SendModMessage(ApiModId, _heatApi);
 
             HashSet<IMyEntity> allEntities = new HashSet<IMyEntity>();
             MyAPIGateway.Entities.GetEntities(allEntities);
@@ -130,47 +166,21 @@ namespace TSUT.HeatManagement
 
         private static bool IsPlayrGrid(IMyCubeGrid grid)
         {
-            if (grid.CustomName.Contains(Config.HeatDebugString))
-            {
-                MyLog.Default.WriteLine($"[HMS.IsPlayerGrid] Working on {grid.DisplayName}...");
-            }
             if (grid == null)
                 return false;
 
             var terminalBlocks = new List<IMyTerminalBlock>();
             MyAPIGateway.TerminalActionsHelper.GetTerminalSystemForGrid(grid)?.GetBlocks(terminalBlocks);
-            if (grid.CustomName.Contains(Config.HeatDebugString))
-            {
-                MyLog.Default.WriteLine($"[HMS.IsPlayerGrid] Got {terminalBlocks.Count} blocks...");
-            }
             foreach (var block in terminalBlocks)
             {
-                if (grid.CustomName.Contains(Config.HeatDebugString))
-                {
-                    MyLog.Default.WriteLine($"[HMS.IsPlayerGrid] Checking {block.CustomName}...");
-                }
                 if (block.OwnerId == 0)
                     continue;
-
-                if (grid.CustomName.Contains(Config.HeatDebugString))
-                {
-                    MyLog.Default.WriteLine($"[HMS.IsPlayerGrid] Has owner ID {block.OwnerId}");
-                }
 
                 var identity = MyAPIGateway.Players.TryGetIdentityId(block.OwnerId);
                 if (identity != null)
                 {
-                    if (grid.CustomName.Contains(Config.HeatDebugString))
-                    {
-                        MyLog.Default.WriteLine($"[HMS.IsPlayerGrid] Identity found");
-                    }
                     return true; // At least one terminal block is owned by a player
                 }
-            }
-
-            if (grid.CustomName.Contains(Config.HeatDebugString))
-            {
-                MyLog.Default.WriteLine($"[HMS.IsPlayerGrid] No suitable block found");
             }
 
             return false;
@@ -178,20 +188,12 @@ namespace TSUT.HeatManagement
 
         private void OnBlockAdded(IMySlimBlock block)
         {
-            if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-            {
-                MyLog.Default.WriteLine($"[HMS.OnBlockAdd] checking {block.BlockDefinition.DisplayNameText}");
-            }
             if (block.FatBlock == null)
             {
                 return;
             }
             if (block.FatBlock is IMyTerminalBlock)
             {
-                if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-                {
-                    MyLog.Default.WriteLine($"[HMS.OnBlockAdd] It is terminal block...");
-                }
                 OnAnyBlockOwnershipChanged(block.FatBlock as IMyTerminalBlock);
             }
         }
@@ -237,6 +239,21 @@ namespace TSUT.HeatManagement
                     manager.UpdateNeighborsTemp(passedTime);
                 }
                 _lastNeighborsUpdateTick = _tickCount;
+
+                // Notify all event controller events
+                foreach (var eventControllerEvent in _heatApi.Registry.GetEventControllerEvents())
+                {
+                    if (eventControllerEvent != null && eventControllerEvent is BlockTemperatureChanged)
+                    {
+                        var heatEvent = eventControllerEvent as BlockTemperatureChanged;
+                        heatEvent.NotifyValuesChanged();
+                    }
+                    else if (eventControllerEvent != null && eventControllerEvent is GridMaxTemperatureChanged)
+                    {
+                        var heatEvent = eventControllerEvent as GridMaxTemperatureChanged;
+                        heatEvent.NotifyValuesChanged();
+                    }
+                }
             }
         }
 
@@ -254,10 +271,6 @@ namespace TSUT.HeatManagement
             {
                 bool shouldHave = IsPlayrGrid(grid);
                 bool has = _gridHeatManagers.ContainsKey(grid);
-                if (grid.CustomName.Contains(Config.HeatDebugString))
-                {
-                    MyLog.Default.WriteLine($"[HMS.OnGridOwnershipChanged] ShouldHave: {shouldHave}, has: {has}");
-                }
                 if (shouldHave && !has)
                 {
                     _gridHeatManagers[grid] = new GridHeatManager(grid);
@@ -279,8 +292,10 @@ namespace TSUT.HeatManagement
                 if (block != null)
                 {
                     _heatApi.Utils.SetHeat(block, heat, true);
-                    foreach(var gridManager in _gridHeatManagers.Values) {
-                        if (gridManager.TryReactOnHeat(block, heat)){
+                    foreach (var gridManager in _gridHeatManagers.Values)
+                    {
+                        if (gridManager.TryReactOnHeat(block, heat))
+                        {
                             return;
                         }
                     }
@@ -296,6 +311,15 @@ namespace TSUT.HeatManagement
             _initialized = true;
 
             MyAPIGateway.TerminalControls.CustomControlGetter += OnCustomControlGetter;
+        }
+
+        public static void GetGridHeatManager(IMyCubeGrid grid, out GridHeatManager manager)
+        {
+            if (_gridHeatManagers.TryGetValue(grid, out manager))
+                return;
+
+            manager = new GridHeatManager(grid);
+            _gridHeatManagers[grid] = manager;
         }
 
         private static void OnCustomControlGetter(IMyTerminalBlock block, List<IMyTerminalControl> controls)
@@ -315,7 +339,7 @@ namespace TSUT.HeatManagement
             checkbox.Getter = b =>
             {
                 GridHeatManager gridManager;
-                if (HeatSession._gridHeatManagers.TryGetValue(b.CubeGrid, out gridManager))
+                if (_gridHeatManagers.TryGetValue(b.CubeGrid, out gridManager))
                     return gridManager.GetShowDebug();
                 return false;
             };
@@ -323,11 +347,70 @@ namespace TSUT.HeatManagement
             checkbox.Setter = (b, value) =>
             {
                 GridHeatManager gridManager;
-                if (HeatSession._gridHeatManagers.TryGetValue(b.CubeGrid, out gridManager))
+                if (_gridHeatManagers.TryGetValue(b.CubeGrid, out gridManager))
                     gridManager.SetShowDebug(value);
             };
 
             controls.Add(checkbox);
+        }
+
+        private Dictionary<string, object> ConvertApiToShareable(HeatApi heatApi)
+        {
+            return new Dictionary<string, object>
+            {
+                { "CalculateAmbientTemperature", new Func<long, float>(blockId =>
+                    heatApi.Utils.CalculateAmbientTemperature(MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock)) },
+                { "EstimateSpecificHeat", new Func<float, float>(density =>
+                heatApi.Utils.EstimateSpecificHeat(density)) },
+                { "GetActiveThrusterHeatLoss", new Func<long, float, float, float>((thrusterId, ratio, dt) =>
+                    heatApi.Utils.GetActiveThrusterHeatLoss(MyAPIGateway.Entities.GetEntityById(thrusterId) as IMyThrust, ratio, dt)) },
+                { "GetActiveVentHeatLoss", new Func<long, float, float>((ventId, dt) =>
+                    heatApi.Utils.GetActiveVentHealLoss(MyAPIGateway.Entities.GetEntityById(ventId) as IMyAirVent, dt)) },
+                { "GetActiveHeatVentLoss", new Func<long, float, float>((ventId, dt) =>
+                    heatApi.Utils.GetActiveHeatVentLoss(MyAPIGateway.Entities.GetEntityById(ventId) as IMyHeatVent, dt)) },
+                { "GetAmbientHeatLoss", new Func<long, float, float>((blockId, dt) =>
+                    heatApi.Utils.GetAmbientHeatLoss(MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock, dt)) },
+                { "GetDensity", new Func<long, float>(blockId =>
+                    heatApi.Utils.GetDensity(MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock)) },
+                { "GetHeat", new Func<long, float>(blockId =>
+                    heatApi.Utils.GetHeat(MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock)) },
+                { "GetLargestFaceArea", new Func<long, float>(slimId =>
+                    heatApi.Utils.GetLargestFaceArea(MyAPIGateway.Entities.GetEntityById(slimId) as IMySlimBlock)) },
+                { "GetMass", new Func<long, float>(blockId =>
+                    heatApi.Utils.GetMass(MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock)) },
+                { "GetRealSurfaceArea", new Func<long, float>(blockId =>
+                    heatApi.Utils.GetRealSurfaceArea(MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock)) },
+                { "GetSunDirection", new Func<long, long, VRageMath.Vector3D>((blockId, planetId) =>
+                    heatApi.Utils.GetSunDirection(
+                        MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock,
+                        MyAPIGateway.Entities.GetEntityById(planetId) as MyPlanet)) },
+                { "GetTemperatureOnPlanet", new Func<VRageMath.Vector3D, float>(pos =>
+                    heatApi.Utils.GetTemperatureOnPlanet(pos)) },
+                { "GetThermalCapacity", new Func<long, float>(blockId =>
+                    heatApi.Utils.GetThermalCapacity(MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock)) },
+                { "IsBlockInPressurizedRoom", new Func<long, bool>(blockId =>
+                    heatApi.Utils.IsBlockInPressurizedRoom(MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock)) },
+                { "PurgeCaches", new Action(() => heatApi.Utils.PurgeCaches()) },
+                { "SetHeat", new Action<long, float, bool>((blockId, heat, silent) =>
+                    heatApi.Utils.SetHeat(MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock, heat, silent)) },
+                { "ApplyHeatChange", new Func<long, float, float>((blockId, heat) =>
+                    heatApi.Utils.ApplyHeatChange(MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock, heat)) },
+                { "GetBlockWindSpeed", new Func<long, float>(blockId =>
+                    heatApi.Utils.GetBlockWindSpeed(MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock)) },
+                { "GetExchangeWithNeighbor", new Func<long, long, float, float>((blockId, neighborId, dt) =>
+                    heatApi.Utils.GetExchangeWithNeighbor(
+                        MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock,
+                        MyAPIGateway.Entities.GetEntityById(neighborId) as IMyCubeBlock,
+                        dt)) },
+                { "GetAirDensity", new Func<long, float>(blockId =>
+                    heatApi.Utils.GetAirDensity(MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock)) },
+                { "GetActiveExhaustHeatLoss", new Func<long, float, float>((exhaustId, dt) =>
+                    heatApi.Utils.GetActiveExhaustHeatLoss(MyAPIGateway.Entities.GetEntityById(exhaustId) as IMyExhaustBlock, dt)) },
+                { "InstantiateSmoke", new Action<long>(blockId => heatApi.Effects.InstantiateSmoke(MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock))},
+                { "RemoveSmoke", new Action<long>(blockId => heatApi.Effects.RemoveSmoke(MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock)) },
+                { "UpdateBlockHeatLight", new Action<long, float>((blockId, heat) => heatApi.Effects.UpdateBlockHeatLight(MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock, heat)) },
+                { "UpdateLightsPosition", new Action(() => heatApi.Effects.UpdateLightsPosition()) }
+            };
         }
     }
 }
