@@ -51,6 +51,7 @@
   <ItemGroup>
     <Compile Include="Config.cs" />
     <Compile Include="HeatApi.cs" />
+    <Compile Include="ShareableApi.cs" />
     <Compile Include="HeatUtils.cs" />
     <Compile Include="HeatEffects.cs" />
     <Compile Include="HeatBehaviorRgistry.cs" />
@@ -63,6 +64,12 @@
     <Compile Include="ExhaustHeatManager.cs" />
     <Compile Include="HeatNetwork.cs" />
     <Compile Include="Networking.cs" />
+    <Compile Include="Events\IEventControllerEvent.cs" />
+    <Compile Include="Events\BlockTemperatureChanged.cs" />
+    <Compile Include="Events\GridMaxTemperatureChanged.cs" />
+    <Compile Include="Builders\ObjectBuilderHeat.cs" />
+    <Compile Include="Builders\ObjectBuilderGridHeat.cs" />
+    <Compile Include="HmsApiV1.0.cs" />
     <Compile Include="Session.cs" />
   </ItemGroup>
   <ItemGroup>

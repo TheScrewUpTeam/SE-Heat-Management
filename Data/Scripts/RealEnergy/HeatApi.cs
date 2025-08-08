@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Generic;
 using Sandbox.Game.Entities;
 using Sandbox.ModAPI;
 using SpaceEngineers.Game.ModAPI;
+using SpaceEngineers.Game.VoiceChat;
 using VRage.Game.ModAPI;
 using VRageMath;
 
@@ -45,6 +47,13 @@ namespace TSUT.HeatManagement
     {
         void RegisterHeatBehaviorFactory(IHeatBehaviorFactory factory);
         IReadOnlyList<IHeatBehaviorFactory> GetFactories();
+        void RegisterEventControllerEvent(IEventControllerEvent eventControllerEvent);
+        IReadOnlyList<IEventControllerEvent> GetEventControllerEvents();
+        void RemoveEventControllerEvent(IEventControllerEvent eventControllerEvent);
+        void RegisterHeatBehaviorProvider(Func<long, IDictionary<long, IDictionary<string, object>>> provider);
+        IEnumerable<Func<long, IDictionary<long, IDictionary<string, object>>>> GetHeatBehaviorProviders();
+        void RegisterHeatMapper(Func<long, IDictionary<string, object>> mapper);
+        IEnumerable<Func<long, IDictionary<string, object>>> GetHeatMappers();
     }
 
     public interface IHeatUtils
