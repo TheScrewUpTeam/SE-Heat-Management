@@ -8,6 +8,7 @@ using Sandbox.ModAPI;
 using SpaceEngineers.Game.ModAPI;
 using VRage.Game;
 using VRage.Game.ModAPI;
+using VRage.Utils;
 using VRageMath;
 
 namespace TSUT.HeatManagement
@@ -196,13 +197,10 @@ namespace TSUT.HeatManagement
 
         public float CalculateAmbientTemperature(IMyCubeBlock block)
         {
-            var position = block.GetPosition();
-
             if (IsBlockInPressurizedRoom(block))
             {
                 return 20f;
             }
-
 
             var worldPos = block.CubeGrid.GridIntegerToWorld(block.Position);
 
@@ -255,7 +253,8 @@ namespace TSUT.HeatManagement
             }
 
             MyTemperatureLevel minTemperature = planet.Generator.DefaultSurfaceTemperature;
-            switch (minTemperature) {
+            switch (minTemperature)
+            {
                 case MyTemperatureLevel.ExtremeFreeze:
                     ambientTemp = -100.15f;
                     break;
@@ -271,6 +270,15 @@ namespace TSUT.HeatManagement
                 case MyTemperatureLevel.ExtremeHot:
                     ambientTemp = 250f;
                     break;
+            }
+
+            // If standard value returned => fallback logic
+            if (minTemperature == MyTemperatureLevel.Cozy)
+            {
+                // Altitude-based temperature calculation
+                float altitude = (float)(position - planet.PositionComp.WorldAABB.Center).Length() - (float)planet.AverageRadius;
+                float normalizedAlt = MathHelper.Clamp(altitude / 10000f, 0f, 1f);
+                ambientTemp = MathHelper.Lerp(25f, -50f, normalizedAlt);
             }
 
             // Sunlight effect
