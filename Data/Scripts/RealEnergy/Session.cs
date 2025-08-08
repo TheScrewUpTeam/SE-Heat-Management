@@ -58,9 +58,9 @@ namespace TSUT.HeatManagement
             _heatApi.Registry.RegisterHeatBehaviorFactory(new HeatPipeManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new HeatVentManagerFactory());
 
-            MyAPIGateway.Utilities.RegisterMessageHandler(ShareableApi.HeatProviderMesageId, OnHeatProviderRegister);
+            MyAPIGateway.Utilities.RegisterMessageHandler(HmsApi.HeatProviderMesageId, OnHeatProviderRegister);
             var shareable = ConvertApiToShareable(_heatApi);
-            MyAPIGateway.Utilities.SendModMessage(ShareableApi.HeatApiMessageId, shareable);
+            MyAPIGateway.Utilities.SendModMessage(HmsApi.HeatApiMessageId, shareable);
             MyLog.Default.WriteLine($"[HeatManagement] HeatAPI populated");
         }
 
@@ -103,7 +103,7 @@ namespace TSUT.HeatManagement
         protected override void UnloadData()
         {
             networking?.Unregister();
-            MyAPIGateway.Utilities.UnregisterMessageHandler(ShareableApi.HeatProviderMesageId, OnHeatProviderRegister);
+            MyAPIGateway.Utilities.UnregisterMessageHandler(HmsApi.HeatProviderMesageId, OnHeatProviderRegister);
         }
 
         public override void BeforeStart()
