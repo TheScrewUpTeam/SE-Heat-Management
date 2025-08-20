@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using Sandbox.ModAPI;
+using VRage;
 using VRage.Game;
 using VRage.Game.ModAPI;
 using VRage.Utils;

@@ -120,6 +120,8 @@ namespace TSUT.HeatManagement
 
             MyAPIGateway.Entities.OnEntityAdd += OnEntityAdd;
             MyAPIGateway.Entities.OnEntityRemove += OnEntityRemove;
+
+            networking.SendToServer(new RequestHeatConfig());
         }
 
         private void OnEntityRemove(IMyEntity entity)
@@ -205,17 +207,16 @@ namespace TSUT.HeatManagement
 
         public override void UpdateBeforeSimulation()
         {
-            _heatApi.Effects.UpdateLightsPosition();
+            ClientSideUpdates();
 
-            foreach (var manager in _gridHeatManagers.Values)
-            {
-                manager.UpdateVisuals(MyEngineConstants.UPDATE_STEP_SIZE_IN_SECONDS);
-            }
+            if (MyAPIGateway.Multiplayer.IsServer)
+                ServerSideUpdates();
+
             _tickCount++;
+        }
 
-            if (!MyAPIGateway.Multiplayer.IsServer)
-                return;
-
+        private void ServerSideUpdates()
+        {
             if (_tickCount % MAIN_UPDATE_INTERVAL == 0)
             {
                 float passedTicks = _tickCount - _lastMainUpdateTick;
@@ -239,7 +240,20 @@ namespace TSUT.HeatManagement
                     manager.UpdateNeighborsTemp(passedTime);
                 }
                 _lastNeighborsUpdateTick = _tickCount;
+            }
+        }
 
+        private void ClientSideUpdates()
+        {
+            _heatApi.Effects.UpdateLightsPosition();
+
+            foreach (var manager in _gridHeatManagers.Values)
+            {
+                manager.UpdateVisuals(MyEngineConstants.UPDATE_STEP_SIZE_IN_SECONDS);
+            }
+
+            if (_tickCount % NEIGHBOT_UPDATE_INTERVAL == 0)
+            {
                 // Notify all event controller events
                 foreach (var eventControllerEvent in _heatApi.Registry.GetEventControllerEvents())
                 {
@@ -253,6 +267,28 @@ namespace TSUT.HeatManagement
                         var heatEvent = eventControllerEvent as GridMaxTemperatureChanged;
                         heatEvent.NotifyValuesChanged();
                     }
+                }
+            }
+        }
+
+        public static void UpdateEventControllers(long entityId)
+        {
+            foreach (var eventController in _heatApi.Registry.GetEventControllerEvents())
+            {
+                if (eventController != null)
+                {
+                    eventController.UpdateDetailedInfo(entityId);
+                }
+            }
+        }
+
+        internal static void UpdateEventControllerSettings(long entityId, float threshold)
+        {
+            foreach (var eventController in _heatApi.Registry.GetEventControllerEvents())
+            {
+                if (eventController != null)
+                {
+                    eventController.UpdateSettings(entityId, threshold);
                 }
             }
         }
@@ -411,6 +447,41 @@ namespace TSUT.HeatManagement
                 { "UpdateBlockHeatLight", new Action<long, float>((blockId, heat) => heatApi.Effects.UpdateBlockHeatLight(MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock, heat)) },
                 { "UpdateLightsPosition", new Action(() => heatApi.Effects.UpdateLightsPosition()) }
             };
+        }
+
+        internal static void OnHeatConfigRequested(RequestHeatConfig request)
+        {
+            var message = new HeatConfigResponse
+            {
+                HEAT_COOLDOWN_COEFF = Config.Instance.HEAT_COOLDOWN_COEFF,
+                HEAT_RADIATION_COEFF = Config.Instance.HEAT_RADIATION_COEFF,
+                DISCHARGE_HEAT_FRACTION = Config.Instance.DISCHARGE_HEAT_FRACTION,
+                THERMAL_CONDUCTIVITY = Config.Instance.THERMAL_CONDUCTIVITY,
+                VENT_COOLING_RATE = Config.Instance.VENT_COOLING_RATE,
+                THRUSTER_COOLING_RATE = Config.Instance.THRUSTER_COOLING_RATE,
+                CRITICAL_TEMP = Config.Instance.CRITICAL_TEMP,
+                WIND_COOLING_MULT = Config.Instance.WIND_COOLING_MULT,
+                HEATPIPE_CONDUCTIVITY = Config.Instance.HEATPIPE_CONDUCTIVITY,
+                EXHAUST_HEAT_REJECTION_RATE = Config.Instance.EXHAUST_HEAT_REJECTION_RATE,
+                LIMIT_TO_PLAYER_GRIDS = Config.Instance.LIMIT_TO_PLAYER_GRIDS
+            };
+
+            networking.SendToPlayer(message, request.SenderId);
+        }
+
+        internal static void UpdateHeatConfig(HeatConfigResponse heatConfigResponse)
+        {
+            Config.Instance.HEAT_COOLDOWN_COEFF = heatConfigResponse.HEAT_COOLDOWN_COEFF;
+            Config.Instance.HEAT_RADIATION_COEFF = heatConfigResponse.HEAT_RADIATION_COEFF;
+            Config.Instance.DISCHARGE_HEAT_FRACTION = heatConfigResponse.DISCHARGE_HEAT_FRACTION;
+            Config.Instance.THERMAL_CONDUCTIVITY = heatConfigResponse.THERMAL_CONDUCTIVITY;
+            Config.Instance.VENT_COOLING_RATE = heatConfigResponse.VENT_COOLING_RATE;
+            Config.Instance.THRUSTER_COOLING_RATE = heatConfigResponse.THRUSTER_COOLING_RATE;
+            Config.Instance.CRITICAL_TEMP = heatConfigResponse.CRITICAL_TEMP;
+            Config.Instance.WIND_COOLING_MULT = heatConfigResponse.WIND_COOLING_MULT;
+            Config.Instance.HEATPIPE_CONDUCTIVITY = heatConfigResponse.HEATPIPE_CONDUCTIVITY;
+            Config.Instance.EXHAUST_HEAT_REJECTION_RATE = heatConfigResponse.EXHAUST_HEAT_REJECTION_RATE;
+            Config.Instance.LIMIT_TO_PLAYER_GRIDS = heatConfigResponse.LIMIT_TO_PLAYER_GRIDS;
         }
     }
 }

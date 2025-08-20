@@ -99,6 +99,7 @@ namespace TSUT.HeatManagement
             {
                 b.Components.Get<GridMaxTemperatureChanged>()._temperatureThreshold = value;
                 b.Components.Get<GridMaxTemperatureChanged>().NotifyValuesChanged();
+                NotifyServer(b.EntityId, value);
             };
             sliderBox.Title = MyStringId.GetOrCompute("Threshold");
             sliderBox.Tooltip = MyStringId.GetOrCompute("Set the temperature threshold for triggering the event.");
@@ -176,6 +177,30 @@ namespace TSUT.HeatManagement
             info.AppendLine();
             info.AppendFormat(MyTexts.GetString(MySpaceTexts.EventOutputInfo), _lastTriggeredAction + 1);
             EventController.SetDetailedInfoDirty();
+        }
+
+        public void UpdateSettings(long entityId, float treshholdValue)
+        {
+            if (entityId != EventController.EntityId)
+                return;
+
+            _temperatureThreshold = treshholdValue;
+            NotifyValuesChanged();
+        }
+
+        private void NotifyServer(long entityId, float threshold)
+        {
+            // Sync should be going from CLIENT to SERVER!
+            if (MyAPIGateway.Multiplayer.IsServer)
+                return;
+
+            var message = new HeatEventSettingsSync
+            {
+                EntityId = entityId,
+                Threshold = threshold
+            };
+
+            HeatSession.networking?.SendToServer(message);
         }
     }
 }

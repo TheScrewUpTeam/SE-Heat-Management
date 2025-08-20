@@ -9,6 +9,7 @@ using VRage;
 using System.Linq;
 using VRage.Game.ModAPI;
 using VRage.Game.ObjectBuilders.ComponentSystem;
+using System;
 
 namespace TSUT.HeatManagement
 {
@@ -121,6 +122,7 @@ namespace TSUT.HeatManagement
             {
                 b.Components.Get<BlockTemperatureChanged>()._temperatureThreshold = value;
                 b.Components.Get<BlockTemperatureChanged>().NotifyValuesChanged();
+                NotifyServer(b.EntityId, value);
             };
             sliderBox.Title = MyStringId.GetOrCompute("Threshold");
             sliderBox.Tooltip = MyStringId.GetOrCompute("Set the temperature threshold for triggering the event.");
@@ -140,14 +142,16 @@ namespace TSUT.HeatManagement
 
         public void NotifyValuesChanged()
         {
-            if (!MyAPIGateway.Multiplayer.IsServer)
-                return;
 
             if (EventController == null)
                 return;
 
             if (!IsSelected)
                 return;
+
+            if (!MyAPIGateway.Multiplayer.IsServer){
+                UpdateDetailedInfo(EventController.EntityId);
+            }
 
             float threshold = _temperatureThreshold;
             bool isBelow = EventController.IsLowerOrEqualCondition;
@@ -177,16 +181,13 @@ namespace TSUT.HeatManagement
             }
             EventController.TriggerAction(result ? 0 : 1);
             _lastTriggeredAction = result ? 0 : 1;
-            UpdateDetailedInfo(EventController.EntityId);
         }
 
         public void RemoveBlocks(IEnumerable<IMyTerminalBlock> blocks)
         {
-            MyLog.Default.WriteLine($"HeatThresholdReachedEvent: Removing blocks. Count: {blocks.Count()}");
             foreach (var block in blocks)
             {
                 _blocks.Remove(block);
-                MyLog.Default.WriteLine($"HeatThresholdReachedEvent: Removed block {block.CustomName}");
             }
             UpdateDetailedInfo(EventController.EntityId);
         }
@@ -215,6 +216,45 @@ namespace TSUT.HeatManagement
             }
             info.AppendFormat(MyTexts.GetString(MySpaceTexts.EventOutputInfo), _lastTriggeredAction + 1);
             EventController.SetDetailedInfoDirty();
+
+            NotifyClients(entityId);
+        }
+
+        private void NotifyClients(long entityId)
+        {
+            if (!MyAPIGateway.Multiplayer.IsServer)
+                return;
+
+            var message = new HeatEventSync
+            {
+                EntityId = entityId
+            };
+
+            HeatSession.networking?.RelayToClients(message);
+        }
+
+        private void NotifyServer(long entityId, float threshold)
+        {
+            // Sync should be going from CLIENT to SERVER!
+            if (MyAPIGateway.Multiplayer.IsServer)
+                return;
+
+            var message = new HeatEventSettingsSync
+            {
+                EntityId = entityId,
+                Threshold = threshold
+            };
+
+            HeatSession.networking?.SendToServer(message);
+        }
+
+        public void UpdateSettings(long entityId, float treshholdValue)
+        {
+            if (entityId != EventController.EntityId)
+                return;
+
+            _temperatureThreshold = treshholdValue;
+            NotifyValuesChanged();
         }
     }
 }

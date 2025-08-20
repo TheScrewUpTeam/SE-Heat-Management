@@ -4,6 +4,7 @@ using System.Text;
 using Sandbox.ModAPI;
 using VRage.Game;
 using VRage.Game.ModAPI;
+using VRage.Utils;
 using VRageMath;
 
 namespace TSUT.HeatManagement
@@ -297,7 +298,9 @@ namespace TSUT.HeatManagement
 
         public void ReactOnNewHeat(float heat)
         {
-            this._battery.RefreshCustomInfo();
+            MyLog.Default.WriteLine($"[HeatManagement] Battery {_battery.DisplayNameText} React on new heat called");
+            _battery.SetDetailedInfoDirty();
+            _battery.RefreshCustomInfo();
             HeatSession.Api.Effects.UpdateBlockHeatLight(_battery, heat);
             // Check if we need to instantiate or remove smoke effects
             if (heat > Config.Instance.SMOKE_TRESHOLD)

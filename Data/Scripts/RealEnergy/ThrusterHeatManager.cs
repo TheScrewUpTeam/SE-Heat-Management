@@ -7,6 +7,8 @@ namespace TSUT.HeatManagement
 {
     public class ThrusterHeatManagerFactory : IHeatBehaviorFactory
     {
+        const string THRUSTER_CODE = "AtmosphericThrust";
+
         public void CollectHeatBehaviors(IMyCubeGrid grid, IGridHeatManager manager, IDictionary<IMyCubeBlock, IHeatBehavior> behaviorMap)
         {
             List<IMyThrust> thrusters = new List<IMyThrust>();
@@ -14,7 +16,7 @@ namespace TSUT.HeatManagement
 
             foreach (var thruster in thrusters)
             {
-                if (!behaviorMap.ContainsKey(thruster))
+                if (!behaviorMap.ContainsKey(thruster) && thruster.BlockDefinition.SubtypeName.Contains(THRUSTER_CODE))
                 {
                     behaviorMap[thruster] = new ThrusterHeatManager(thruster, manager);
                 }
@@ -26,7 +28,7 @@ namespace TSUT.HeatManagement
             var result = new HeatBehaviorAttachResult();
             result.AffectedBlocks = new List<IMyCubeBlock> { block };
 
-            if (block is IMyThrust)
+            if (block is IMyThrust && block.BlockDefinition.SubtypeName.Contains(THRUSTER_CODE))
             {
                 result.Behavior = new ThrusterHeatManager(block as IMyThrust, manager);
                 return result;

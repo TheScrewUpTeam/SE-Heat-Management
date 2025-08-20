@@ -4,6 +4,7 @@ using Sandbox.Game.Entities;
 using Sandbox.ModAPI;
 using SpaceEngineers.Game.ModAPI;
 using VRage.Game.ModAPI;
+using VRage.Utils;
 using VRageMath;
 
 namespace TSUT.HeatManagement
@@ -37,21 +38,6 @@ namespace TSUT.HeatManagement
             _onReady?.Invoke();
         }
 
-        /// <summary>
-        /// Registers a factory for creating custom heat behaviors for blocks on a grid.
-        /// </summary>
-        /// <param name="blockSelector">
-        ///   A function that receives a <see cref="MyCubeGrid"/> and returns a list of blocks (<see cref="IMyCubeBlock"/>)
-        ///   that should have custom heat behaviors. This is called once per grid when the heat system initializes or when a new grid is loaded.
-        ///   Use this to filter/select only the blocks you want to attach custom heat logic to.
-        /// </param>
-        /// <param name="behaviorCreator">
-        ///   A function that receives a block (<see cref="IMyCubeBlock"/>) and returns an instance of your custom <see cref="AHeatBehavior"/>.
-        ///   This is called for each block returned by <paramref name="blockSelector"/> to instantiate the heat behavior for that block.
-        ///   It is also called individually when a new block is added to the grid at runtime.
-        ///   Return <c>null</c> if you do not want to attach a behavior to a particular block.
-        ///   !!! IMPORTANT !!! Always check block to make sure that it's the block type you want
-        /// </param>
         public void RegisterHeatBehaviorFactory(
             Func<MyCubeGrid, List<IMyCubeBlock>> blockSelector,
             Func<IMyCubeBlock, AHeatBehavior> behaviorCreator
@@ -239,7 +225,7 @@ namespace TSUT.HeatManagement
             // }
 
             /// <summary>
-            /// Called twice a second to calculate the heat change for this block.
+            /// Called every simulation tick to calculate the heat change for this block.
             /// Return the amount of heat to add (positive) or remove (negative) for the given deltaTime.
             /// This is the main entry point for your custom heat logic.
             /// </summary>
@@ -248,7 +234,7 @@ namespace TSUT.HeatManagement
             abstract public float GetHeatChange(float deltaTime);
 
             /// <summary>
-            /// Called every 1.5 second to allow this block to exchange heat with its neighbors.
+            /// Called every simulation tick to allow this block to exchange heat with its neighbors.
             /// Use this to implement heat spreading or networked heat transfer.
             /// </summary>
             /// <param name="deltaTime">The time in seconds since the last update.</param>
@@ -266,6 +252,46 @@ namespace TSUT.HeatManagement
             /// </summary>
             /// <param name="heat">The new heat value of the block.</param>
             abstract public void ReactOnNewHeat(float heat);
+
+            internal void SpreadHeatStandard(float deltaTime, IMyCubeBlock block, HmsApi api)
+            {
+                var temperatureChange = 0f;
+                var heatExchangeWithNeighbors = CalculateNeighborExchangeStandard(deltaTime, block, api, ref temperatureChange);
+                foreach (var kvm in heatExchangeWithNeighbors)
+                {
+                    var neighbor = kvm.Key;
+                    var tempChange = kvm.Value;
+                    var neighborTemp = api.Utils.GetHeat(neighbor);
+                    api.Utils.SetHeat(neighbor, neighborTemp + tempChange);
+                }
+
+                var ownTemperature = api.Utils.GetHeat(block);
+                api.Utils.SetHeat(block, ownTemperature + temperatureChange);
+            }
+
+            public Dictionary<IMyCubeBlock, float> CalculateNeighborExchangeStandard(float deltaTime, IMyCubeBlock block, HmsApi api, ref float ownHeatChange)
+            {
+                var neighborList = new List<IMySlimBlock>();
+                block.SlimBlock.GetNeighbours(neighborList);
+
+                var result = new Dictionary<IMyCubeBlock, float>();
+                float energyTransferred = 0f;
+
+                foreach (var neighborSlim in neighborList)
+                {
+                    var neighborFat = neighborSlim.FatBlock;
+                    if (neighborFat == null)
+                        continue;
+                    var capacity = api.Utils.GetThermalCapacity(neighborFat);
+                    var transfer = api.Utils.GetExchangeWithNeighbor(block, neighborFat, deltaTime) * capacity;
+                    result.Add(neighborFat, -transfer / capacity);
+                    energyTransferred += transfer;
+                }
+
+                var ownCapacity = api.Utils.GetThermalCapacity(block);
+                ownHeatChange = energyTransferred / ownCapacity;
+                return result;
+            }
         }
 
         private IDictionary<long, IDictionary<string, object>> MapBehaviors(Dictionary<IMyCubeBlock, AHeatBehavior> behaviors)
@@ -288,7 +314,8 @@ namespace TSUT.HeatManagement
             return result;
         }
 
-        private IDictionary<string, object> MapBehavior(AHeatBehavior behavior) {
+        private IDictionary<string, object> MapBehavior(AHeatBehavior behavior)
+        {
             return new Dictionary<string, object>
                 {
                     { "GetHeatChange", new Func<float, float>((deltaTime) => behavior.GetHeatChange(deltaTime)) },
@@ -354,10 +381,10 @@ namespace TSUT.HeatManagement
             public float GetActiveExhaustHeatLoss(IMyExhaustBlock exhaust, float deltaTime)
             {
                 object method;
-                if (client.TryGetValue("GetActiveExhaustHeatLoss", out method) && method is Func<IMyExhaustBlock, float, float>)
+                if (client.TryGetValue("GetActiveExhaustHeatLoss", out method) && method is Func<long, float, float>)
                 {
-                    var fn = (Func<IMyExhaustBlock, float, float>)method;
-                    return fn(exhaust, deltaTime);
+                    var fn = (Func<long, float, float>)method;
+                    return fn(exhaust.EntityId, deltaTime);
                 }
                 return 0f;
             }
@@ -366,10 +393,10 @@ namespace TSUT.HeatManagement
             public float GetActiveHeatVentLoss(IMyHeatVent vent, float deltaTime)
             {
                 object method;
-                if (client.TryGetValue("GetActiveHeatVentLoss", out method) && method is Func<IMyHeatVent, float, float>)
+                if (client.TryGetValue("GetActiveHeatVentLoss", out method) && method is Func<long, float, float>)
                 {
-                    var fn = (Func<IMyHeatVent, float, float>)method;
-                    return fn(vent, deltaTime);
+                    var fn = (Func<long, float, float>)method;
+                    return fn(vent.EntityId, deltaTime);
                 }
                 return 0f;
             }
@@ -402,10 +429,10 @@ namespace TSUT.HeatManagement
             public float GetAirDensity(IMyCubeBlock block)
             {
                 object method;
-                if (client.TryGetValue("GetAirDensity", out method) && method is Func<IMyCubeBlock, float>)
+                if (client.TryGetValue("GetAirDensity", out method) && method is Func<long, float>)
                 {
-                    var fn = (Func<IMyCubeBlock, float>)method;
-                    return fn(block);
+                    var fn = (Func<long, float>)method;
+                    return fn(block.EntityId);
                 }
                 return 0f;
             }
@@ -426,10 +453,10 @@ namespace TSUT.HeatManagement
             public float GetBlockWindSpeed(IMyCubeBlock block)
             {
                 object method;
-                if (client.TryGetValue("GetBlockWindSpeed", out method) && method is Func<IMyCubeBlock, float>)
+                if (client.TryGetValue("GetBlockWindSpeed", out method) && method is Func<long, float>)
                 {
-                    var fn = (Func<IMyCubeBlock, float>)method;
-                    return fn(block);
+                    var fn = (Func<long, float>)method;
+                    return fn(block.EntityId);
                 }
                 return 0f;
             }
@@ -450,11 +477,12 @@ namespace TSUT.HeatManagement
             public float GetExchangeWithNeighbor(IMyCubeBlock block, IMyCubeBlock neighbor, float deltaTime)
             {
                 object method;
-                if (client.TryGetValue("GetExchangeWithNeighbor", out method) && method is Func<IMyCubeBlock, IMyCubeBlock, float, float>)
+                if (client.TryGetValue("GetExchangeWithNeighbor", out method) && method is Func<long, long, float, float>)
                 {
-                    var fn = (Func<IMyCubeBlock, IMyCubeBlock, float, float>)method;
-                    return fn(block, neighbor, deltaTime);
+                    var fn = (Func<long, long, float, float>)method;
+                    return fn(block?.EntityId ?? 0, neighbor?.EntityId ?? 0, deltaTime);
                 }
+                MyLog.Default.Warning($"[H2Real] No method GetExchangeWithNeighbor found {client.Count}");
                 return 0f;
             }
 

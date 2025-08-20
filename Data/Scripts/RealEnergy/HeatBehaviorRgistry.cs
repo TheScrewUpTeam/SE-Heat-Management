@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Sandbox.Game.Entities.Cube;
+using VRage.Game.ModAPI;
 using VRage.Utils;
 
 namespace TSUT.HeatManagement
