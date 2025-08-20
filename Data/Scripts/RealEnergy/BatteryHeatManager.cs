@@ -298,7 +298,6 @@ namespace TSUT.HeatManagement
 
         public void ReactOnNewHeat(float heat)
         {
-            MyLog.Default.WriteLine($"[HeatManagement] Battery {_battery.DisplayNameText} React on new heat called");
             _battery.SetDetailedInfoDirty();
             _battery.RefreshCustomInfo();
             HeatSession.Api.Effects.UpdateBlockHeatLight(_battery, heat);

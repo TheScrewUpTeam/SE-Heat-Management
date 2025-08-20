@@ -6,7 +6,7 @@ namespace TSUT.HeatManagement
 {
     public class Config
     {
-        public static string Version = "1.2.0";
+        public static string Version = "1.2.1";
         public static ushort HeatSyncMessageId = 7949; // Choose any unused ushort value
 
         public static ushort BlockHeatEventUniqueId = 17949; // Unique ID for block heat events

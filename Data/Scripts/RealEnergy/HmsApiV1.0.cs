@@ -11,7 +11,7 @@ namespace TSUT.HeatManagement
 {
     public class HmsApi
     {
-        public string ApiVersion = "1.0.0";
+        public string ApiVersion = "1.0.1";
         public static long HeatApiMessageId = 35136709491; // Unique message ID for heat API
         public static long HeatProviderMesageId = 35136709492; // Unique message ID for heat provider
 
