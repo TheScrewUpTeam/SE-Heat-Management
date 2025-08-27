@@ -54,6 +54,7 @@
     <Compile Include="ShareableApi.cs" />
     <Compile Include="HeatUtils.cs" />
     <Compile Include="HeatEffects.cs" />
+    <Compile Include="AHeatBehavior.cs" />
     <Compile Include="HeatBehaviorRgistry.cs" />
     <Compile Include="GridHeatManager.cs" />
     <Compile Include="BatteryHeatManager.cs" />

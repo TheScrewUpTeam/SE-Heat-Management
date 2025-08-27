@@ -18,7 +18,7 @@ namespace TSUT.HeatManagement
     [MySessionComponentDescriptor(MyUpdateOrder.BeforeSimulation)]
     public class HeatSession : MySessionComponentBase
     {
-        const int NEIGHBOT_UPDATE_INTERVAL = 100; // in ticks
+        const int NEIGHBOT_UPDATE_INTERVAL = 60; // in ticks
         const int MAIN_UPDATE_INTERVAL = 30; // in ticks
 
         private static HeatApi _heatApi = new HeatApi();
@@ -226,21 +226,25 @@ namespace TSUT.HeatManagement
                 {
                     manager.UpdateBlocksTemp(passedTime);
                 }
-
-                _lastMainUpdateTick = _tickCount;
-            }
-
-            if (_tickCount % NEIGHBOT_UPDATE_INTERVAL == 0)
-            {
-                float passedTicks = _tickCount - _lastNeighborsUpdateTick;
-                float passedTime = passedTicks * MyEngineConstants.UPDATE_STEP_SIZE_IN_SECONDS;
-
+                
                 foreach (var manager in _gridHeatManagers.Values)
                 {
                     manager.UpdateNeighborsTemp(passedTime);
                 }
-                _lastNeighborsUpdateTick = _tickCount;
+                _lastMainUpdateTick = _tickCount;
             }
+
+            // if (_tickCount % NEIGHBOT_UPDATE_INTERVAL == 0)
+            // {
+            //     float passedTicks = _tickCount - _lastNeighborsUpdateTick;
+            //     float passedTime = passedTicks * MyEngineConstants.UPDATE_STEP_SIZE_IN_SECONDS;
+
+            //     foreach (var manager in _gridHeatManagers.Values)
+            //     {
+            //         manager.UpdateNeighborsTemp(passedTime);
+            //     }
+            //     _lastNeighborsUpdateTick = _tickCount;
+            // }
         }
 
         private void ClientSideUpdates()
@@ -445,7 +449,41 @@ namespace TSUT.HeatManagement
                 { "InstantiateSmoke", new Action<long>(blockId => heatApi.Effects.InstantiateSmoke(MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock))},
                 { "RemoveSmoke", new Action<long>(blockId => heatApi.Effects.RemoveSmoke(MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock)) },
                 { "UpdateBlockHeatLight", new Action<long, float>((blockId, heat) => heatApi.Effects.UpdateBlockHeatLight(MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock, heat)) },
-                { "UpdateLightsPosition", new Action(() => heatApi.Effects.UpdateLightsPosition()) }
+                { "UpdateLightsPosition", new Action(() => heatApi.Effects.UpdateLightsPosition()) },
+                { "GetNetworkData", new Func<long, object>(blockId =>
+                    {
+                        var block = MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock;
+                        if (block == null)
+                            return null;
+
+                        var behavior = GetBehaviorForBlock(block);
+
+                        if (behavior == null || !(behavior is HeatPipeManager))
+                            return null;
+
+                        var heatPipeManager = behavior as HeatPipeManager;
+                        return new Dictionary<string, object>(3)
+                        {
+                            { "hash", heatPipeManager.GetNetworkHash() },
+                            { "length", heatPipeManager.GetNetworkSize() },
+                            { "averageTemperature", heatPipeManager.GetAverageTemperature() }
+                        };
+                    })
+                },
+                {
+                    "GetExchangeWithNetwork", new Func<long, long, float, float>((blockId, networkBlockId, dt) =>
+                        heatApi.Utils.GetExchangeWithNetwork(
+                            MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock,
+                            MyAPIGateway.Entities.GetEntityById(networkBlockId) as IMyCubeBlock,
+                            dt))
+                },
+                {
+                    "GetExchangeUniversal", new Func<long, long, float, float>((blockId, neighborBlockId, dt) =>
+                        heatApi.Utils.GetExchangeUniversal(
+                            MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock,
+                            MyAPIGateway.Entities.GetEntityById(neighborBlockId) as IMyCubeBlock,
+                            dt))
+                }
             };
         }
 

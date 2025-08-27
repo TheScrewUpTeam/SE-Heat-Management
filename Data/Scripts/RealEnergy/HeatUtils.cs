@@ -383,7 +383,7 @@ namespace TSUT.HeatManagement
             var surfaceArea = GetRealSurfaceArea(block);
             var airDensity = GetAirDensity(block);
 
-            float energyLoss = 0;
+            float energyLoss;
             if (airDensity > 0)
             {
                 // If there are atmo aroung - just exchange heat with it
@@ -402,7 +402,7 @@ namespace TSUT.HeatManagement
         public float GetActiveVentHealLoss(IMyAirVent vent, float deltaTime)
         {
             float currentTemp = GetHeat(vent);
-            float ambientTemp = CalculateAmbientTemperature(vent) - 2f; // 2 degrees lower than ambient to simulate cooling effect
+            float ambientTemp = CalculateAmbientTemperature(vent) - 10f; // 10 degrees lower than ambient to simulate cooling effect
             float airDensity = GetAirDensity(vent);
             float coolingPower = Config.Instance.VENT_COOLING_RATE * airDensity;
 
@@ -417,7 +417,7 @@ namespace TSUT.HeatManagement
         {
             float airDensity = GetAirDensity(vent);
             float currentTemp = GetHeat(vent);
-            float ambientTemp = CalculateAmbientTemperature(vent) - 2f; // 2 degrees lower than ambient to simulate cooling effect
+            float ambientTemp = CalculateAmbientTemperature(vent) - 10f; // 10 degrees lower than ambient to simulate cooling effect
             float coolingPower = Config.Instance.VENT_COOLING_RATE * airDensity;
 
             float tempDiff = currentTemp - ambientTemp;
@@ -432,17 +432,47 @@ namespace TSUT.HeatManagement
             if (neighbor == null || block == null)
                 return 0f;
 
-            float tempA = HeatSession.Api.Utils.GetHeat(block);
-            float tempB = HeatSession.Api.Utils.GetHeat(neighbor);
-            float capacityA = HeatSession.Api.Utils.GetThermalCapacity(block);
+            float ownTemp = HeatSession.Api.Utils.GetHeat(block);
+            float neighborTemp = HeatSession.Api.Utils.GetHeat(neighbor);
 
-            float tempDiff = tempA - tempB;
+            float tempDiff = ownTemp - neighborTemp;
             float contactArea = HeatSession.Api.Utils.GetLargestFaceArea(neighbor.SlimBlock);
             float energyTransferred = tempDiff * Config.Instance.THERMAL_CONDUCTIVITY * contactArea * deltaTime; // Arbitrary scaling factor for transfer rate
 
-            float deltaA = -energyTransferred / capacityA;
+            return energyTransferred;
+        }
 
-            return deltaA;
+        public float GetExchangeWithNetwork(IMyCubeBlock block, IMyCubeBlock networkBlock, float deltaTime)
+        {
+            if (networkBlock == null || block == null)
+                return 0f;
+
+            var heatBehaviour = HeatSession.GetBehaviorForBlock(networkBlock);
+
+            if (heatBehaviour == null || !(heatBehaviour is HeatPipeManager))
+                return 0f;
+
+            var networkManager = heatBehaviour as HeatPipeManager;
+
+            var energyTransferred = networkManager.GetHeatExchange(networkBlock, block, deltaTime);
+            
+            return energyTransferred;
+        }
+
+        public float GetExchangeUniversal(IMyCubeBlock block, IMyCubeBlock neighborBlock, float deltaTime)
+        {
+            if (block == null || neighborBlock == null)
+                return 0f;
+
+            float delta = 0f;
+            delta += GetExchangeWithNetwork(block, neighborBlock, deltaTime);
+            if (delta != 0f)
+                return delta;
+
+            delta += GetExchangeWithNeighbor(block, neighborBlock, deltaTime);
+            
+
+            return delta;
         }
 
         public float GetActiveExhaustHeatLoss(IMyExhaustBlock exhaust, float deltaTime)
@@ -466,9 +496,9 @@ namespace TSUT.HeatManagement
         public float GetActiveThrusterHeatLoss(IMyThrust thruster, float thrustRatio, float deltaTime)
         {
             float baseCoolingRate = Config.Instance.THRUSTER_COOLING_RATE; // Tunable parameter
-            float effectiveness = MathHelper.Clamp(thrustRatio, 0f, 1f);
+            float effectiveness = MathHelper.Clamp(thrustRatio, 0f, 1f) * 10f;
 
-            float ambientTemp = CalculateAmbientTemperature(thruster) - 2f; // 2 degrees lower than ambient to simulate cooling effect
+            float ambientTemp = CalculateAmbientTemperature(thruster) - 10f; // 10 degrees lower than ambient to simulate cooling effect
             float currentTemp = GetHeat(thruster);
             float deltaT = currentTemp - ambientTemp;
 

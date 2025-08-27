@@ -175,6 +175,32 @@ namespace TSUT.HeatManagement
             /// Calculates the heat loss from an active exhaust block over a given time interval.
             /// </summary>
             float GetActiveExhaustHeatLoss(IMyExhaustBlock exhaust, float deltaTime);
+
+            /// <summary>
+            /// Receives the heat network data.
+            /// Returns null if the block is not part of a heat network.
+            /// </summary>
+            HeatNetworkData? GetNetworkData(IMyCubeBlock block);
+
+            /// <summary>
+            /// Calculates the heat exchange between a block and networkBlock if it's pipe network over a given time interval.
+            /// Returns 0 if the networkBlock is not part of a heat network.
+            /// </summary>
+            float GetExchangeWithNetwork(IMyCubeBlock block, IMyCubeBlock networkBlock, float deltaTime);
+
+            /// <summary>
+            /// Calculates the heat exchange between two blocks over a given time interval.
+            /// Considers both regular adjacency and pipe network connections.
+            /// Returns 0 if the blocks are not connected in any way.
+            /// </summary>
+            float GetExchangeUniversal(IMyCubeBlock block, IMyCubeBlock neighborBlock, float deltaTime);
+        }
+
+        public struct HeatNetworkData
+        {
+            public int hash;
+            public int length;
+            public float averageTemperature;
         }
 
         public interface IHeatEffects
@@ -449,6 +475,42 @@ namespace TSUT.HeatManagement
                 return 0f;
             }
 
+            public HeatNetworkData? GetNetworkData(IMyCubeBlock block)
+            {
+                object method;
+                if (client.TryGetValue("GetNetworkData", out method) && method is Func<long, object>)
+                {
+                    var fn = (Func<long, object>)method;
+                    return MapToNetworkData(fn(block?.EntityId ?? 0));
+                }
+                return null;
+            }
+
+            private HeatNetworkData? MapToNetworkData(object v)
+            {
+                if (v is IDictionary<string, object>)
+                {
+                    var dict = (IDictionary<string, object>)v;
+                    var result = new HeatNetworkData();
+                    object hashObj;
+                    if (dict.TryGetValue("hash", out hashObj) && hashObj is int)
+                    {
+                        result.hash = (int)hashObj;
+                    }
+                    object lengthObj;
+                    if (dict.TryGetValue("length", out lengthObj) && lengthObj is int)
+                    {
+                        result.length = (int)lengthObj;
+                    }
+                    object avgTempObj;
+                    if (dict.TryGetValue("averageTemperature", out avgTempObj) && avgTempObj is float)
+                    {
+                        result.averageTemperature = (float)avgTempObj;
+                    }
+                    return result;
+                }
+                return null;
+            }
 
             public float GetBlockWindSpeed(IMyCubeBlock block)
             {
@@ -592,6 +654,28 @@ namespace TSUT.HeatManagement
                     fn(block?.EntityId ?? 0, heat, silent);
                     return;
                 }
+            }
+
+            public float GetExchangeWithNetwork(IMyCubeBlock block, IMyCubeBlock networkBlock, float deltaTime)
+            {
+                object method;
+                if (client.TryGetValue("GetExchangeWithNetwork", out method) && method is Func<long, long, float, float>)
+                {
+                    var fn = (Func<long, long, float, float>)method;
+                    return fn(block?.EntityId ?? 0, networkBlock?.EntityId ?? 0, deltaTime);
+                }
+                return 0f;
+            }
+
+            public float GetExchangeUniversal(IMyCubeBlock block, IMyCubeBlock neighborBlock, float deltaTime)
+            {
+                object method;
+                if (client.TryGetValue("GetExchangeUniversal", out method) && method is Func<long, long, float, float>)
+                {
+                    var fn = (Func<long, long, float, float>)method;
+                    return fn(block?.EntityId ?? 0, neighborBlock?.EntityId ?? 0, deltaTime);
+                }
+                return 0f;
             }
         }
 

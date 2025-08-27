@@ -38,7 +38,7 @@ namespace TSUT.HeatManagement
         public int Priority => 20; // Vents are less critical than batteries
     }
     
-    public class VentHeatManager : IHeatBehavior
+    public class VentHeatManager : AHeatBehavior
     {
         private IGridHeatManager _gridManager;
         private IMyAirVent _vent;
@@ -54,46 +54,18 @@ namespace TSUT.HeatManagement
         {
             float ownThermalCapacity = HeatSession.Api.Utils.GetThermalCapacity(block);
 
-            var connectedPipeNetworks = new List<HeatPipeManager>();
-            var neighborWithChange = new Dictionary<IMySlimBlock, float>();
-            var neighborList = new List<IMySlimBlock>();
-            var insulatedNeihbors = new List<IMySlimBlock>();
-            block.SlimBlock.GetNeighbours(neighborList);
-            float cumulativeNeighborHeatChange = 0f;
-            float cumulativeNetworkHeatChange = 0f;
-            if (neighborList.Count > 0)
-            {
-                foreach (var neighbor in neighborList)
-                {
-                    var behavior = _gridManager.TryGetHeatBehaviour(neighbor.FatBlock);
-                    if (behavior != null && behavior is HeatPipeManager)
-                    {
-                        var network = behavior as HeatPipeManager;
-                        if (HeatPipeManagerFactory.IsPipeConnectedToBlock(neighbor.FatBlock, _vent)){
-                            if (!connectedPipeNetworks.Contains(network))
-                            {
-                                connectedPipeNetworks.Add(network);
-                            }
-                            neighborWithChange[neighbor] = network.GetHeatExchange(neighbor.FatBlock, _vent, 1) / ownThermalCapacity;
-                            cumulativeNetworkHeatChange += neighborWithChange[neighbor];
-                        } else {
-                            insulatedNeihbors.Add(neighbor);
-                        }
-                    }
-                    else
-                    {
-                        neighborWithChange[neighbor] = HeatSession.Api.Utils.GetExchangeWithNeighbor(_vent, neighbor.FatBlock, 1); // Assuming deltaTime of 1 second for display purposes
-                        cumulativeNeighborHeatChange += neighborWithChange[neighbor];
-                    }
-                }
-            }
-            var heat = HeatSession.Api.Utils.GetHeat(block);
-            float heatChange = GetHeatChange(1f) + cumulativeNeighborHeatChange + cumulativeNetworkHeatChange; // Assuming deltaTime of 1 second for display purposes
+            var neighborStringBuilder = new StringBuilder();
+            float cumulativeNeighborHeatChange;
+            float cumulativeNetworkHeatChange;
+            AddNeighborAndNetworksInfo(_vent, neighborStringBuilder, out cumulativeNeighborHeatChange, out cumulativeNetworkHeatChange);
+            float heatChange = GetHeatChange(1f) - cumulativeNeighborHeatChange - cumulativeNetworkHeatChange; // Assuming deltaTime of 1 second for display purposes
 
             builder.AppendLine($"--- Heat Management ---");
             builder.AppendLine($"Temperature: {HeatSession.Api.Utils.GetHeat(block):F2} °C");
-            builder.AppendLine($"Air Heat Change: {GetHeatChange(1):F2} °C/s");
-            string exchangeMode = _vent.IsFunctional && _vent.Enabled ? "Active" : "Passive";
+            string heatStatus = heatChange > 0 ? "Heating" : heatChange < -0.01 ? "Cooling" : "Stable";
+            builder.AppendLine($"Thermal Status: {heatStatus}");
+            builder.AppendLine($"Net Heat Change: {heatChange:+0.00;-0.00;0.00} °C/s");
+            string exchangeMode = _vent.IsWorking ? "Active" : "Passive";
             builder.AppendLine($"Exchange Mode: {exchangeMode}");
             builder.AppendLine($"Thermal Capacity: {ownThermalCapacity / 1000000:F1} MJ/°C");
             builder.AppendLine($"Ambient temp: {HeatSession.Api.Utils.CalculateAmbientTemperature(block):F1} °C");
@@ -104,51 +76,23 @@ namespace TSUT.HeatManagement
             builder.AppendLine("");
             builder.AppendLine("Heat Sources:");
             builder.AppendLine($"  Air Exchange: {GetHeatChange(1):+0.00;-0.00;0.00} °C/s");
-            builder.AppendLine($"  Neighbor Block: {cumulativeNeighborHeatChange:+0.00;-0.00;0.00} °C/s");
-            builder.AppendLine($"  Heat pipes: {cumulativeNetworkHeatChange:+0.00;-0.00;0.00} °C/s");
-
-            if (neighborList.Count > 0)
-            {
-                builder.AppendLine("");
-                builder.AppendLine($"Neighbors:");
-                foreach (var neighbor in neighborList)
-                {
-                    var neighborBlock = neighbor.FatBlock;
-                    if (neighborBlock != null)
-                    {
-                        if (!insulatedNeihbors.Contains(neighbor)) {
-                            builder.AppendLine($"- {neighborBlock.DisplayNameText} ({HeatSession.Api.Utils.GetHeat(neighborBlock):F2}°C) -> {neighborWithChange[neighbor]:F4} °C/s");
-                        } else {
-                            builder.AppendLine($"- {neighborBlock.DisplayNameText} ({HeatSession.Api.Utils.GetHeat(neighborBlock):F2}°C) !! Insulated");
-                        }                    }
-                }
-            }
-            if (connectedPipeNetworks.Count > 0)
-            {
-                builder.AppendLine("");
-                builder.AppendLine($"Pipe networks:");
-                foreach (var network in connectedPipeNetworks)
-                {
-                    network.AppendNetworkInfo(builder);
-                }
-            }
-            builder.AppendLine($"------");
+            builder.Append(neighborStringBuilder);
         }
 
-        public float GetHeatChange(float deltaTime)
+        public override float GetHeatChange(float deltaTime)
         {
             if (_vent == null)
                 return 0f;
 
             float change = HeatSession.Api.Utils.GetAmbientHeatLoss(_vent, deltaTime);
-            if (_vent.IsFunctional && _vent.Enabled)
+            if (_vent.IsWorking)
             {
                 change += HeatSession.Api.Utils.GetActiveVentHealLoss(_vent, deltaTime);
             }
             return -change;
         }
 
-        public void Cleanup()
+        public override void Cleanup()
         {
             if (_vent != null)
             {
@@ -157,68 +101,15 @@ namespace TSUT.HeatManagement
             }
         }
 
-        public void SpreadHeat(float deltaTime)
+        public override void SpreadHeat(float deltaTime)
         {
-            if (_vent == null)
-                return;
-
-            float cumulativeHeat = 0f;
-            float tempA = HeatSession.Api.Utils.GetHeat(_vent);
-            float capacityA = HeatSession.Api.Utils.GetThermalCapacity(_vent);
-
-            var neighborList = new List<IMySlimBlock>();
-            _vent.SlimBlock.GetNeighbours(neighborList);
-
-            float energyTransferred = 0f;
-
-            foreach (var neighborSlim in neighborList)
-            {
-                var neighborFat = neighborSlim.FatBlock;
-                if (neighborFat == null)
-                    continue;
-                float capacityB = HeatSession.Api.Utils.GetThermalCapacity(neighborFat);
-                float tempB = HeatSession.Api.Utils.GetHeat(neighborFat);
-
-                var behaviour = _gridManager.TryGetHeatBehaviour(neighborFat);
-                if (behaviour != null && behaviour is HeatPipeManager)
-                {
-                    var network = behaviour as HeatPipeManager;
-                    energyTransferred = -network.GetHeatExchange(neighborFat, _vent, deltaTime);
-                }
-                else
-                {
-                    float tempDiff = tempA - tempB;
-
-                    float contactArea = HeatSession.Api.Utils.GetLargestFaceArea(neighborSlim);
-                    energyTransferred = tempDiff * Config.Instance.THERMAL_CONDUCTIVITY * contactArea * deltaTime; // Arbitrary scaling factor for transfer rate
-                }
-
-                // Convert energy to delta-T for each block
-                float deltaA = -energyTransferred / capacityA;
-                float deltaB = energyTransferred / capacityB;
-
-                HeatSession.Api.Utils.SetHeat(_vent, tempA + deltaA);
-
-                float ambientLoss = 0f;
-
-                if (!(neighborFat is IMyAirVent) && !(neighborFat is IMyBatteryBlock))
-                {
-                    // Apply ambient heat exchange for non-vent, non-battery blocks
-                    ambientLoss = HeatSession.Api.Utils.GetAmbientHeatLoss(neighborFat, deltaTime);
-                }
-
-                float newTemp = tempB + deltaB - ambientLoss;
-                HeatSession.Api.Utils.SetHeat(neighborFat, newTemp);
-                HeatSession.Api.Effects.UpdateBlockHeatLight(neighborFat, newTemp);
-
-                cumulativeHeat += deltaA;
-            }
+            SpreadHeatStandard(_vent, deltaTime);
         }
 
-        public void ReactOnNewHeat(float heat)
+        public override void ReactOnNewHeat(float heat)
         {
             HeatSession.Api.Effects.UpdateBlockHeatLight(_vent, heat);
-            this._vent.RefreshCustomInfo();
+            _vent.RefreshCustomInfo();
             return; // Vents do not react to new heat in this implementation
         }
     }

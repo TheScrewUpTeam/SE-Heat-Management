@@ -39,7 +39,7 @@ namespace TSUT.HeatManagement
         public int Priority => 30; // Thrusters are less critical than batteries and vents
     }
 
-    public class ThrusterHeatManager : IHeatBehavior
+    public class ThrusterHeatManager : AHeatBehavior
     {
         private IGridHeatManager _gridManager;
         private IMyThrust _thruster;
@@ -58,78 +58,32 @@ namespace TSUT.HeatManagement
             float ambient = HeatSession.Api.Utils.CalculateAmbientTemperature(block);
             float outputRatio = (_thruster.MaxThrust > 0f) ? (_thruster.CurrentThrust / _thruster.MaxThrust) : 0f;
 
-            var connectedPipeNetworks = new List<HeatPipeManager>();
-            var neighborWithChange = new Dictionary<IMySlimBlock, float>();
-            var neighborList = new List<IMySlimBlock>();
-            var insulatedNeihbors = new List<IMySlimBlock>();
-            block.SlimBlock.GetNeighbours(neighborList);
-            float cumulativeNeighborHeatChange = 0f;
-            float cumulativeNetworkHeatChange = 0f;
-            if (neighborList.Count > 0)
-            {
-                foreach (var neighbor in neighborList)
-                {
-                    var behavior = _gridManager.TryGetHeatBehaviour(neighbor.FatBlock);
-                    if (behavior != null && behavior is HeatPipeManager)
-                    {
-                        var network = behavior as HeatPipeManager;
-                        if (HeatPipeManagerFactory.IsPipeConnectedToBlock(neighbor.FatBlock, _thruster)){
-                            if (!connectedPipeNetworks.Contains(network))
-                            {
-                                connectedPipeNetworks.Add(network);
-                            }
-                            neighborWithChange[neighbor] = network.GetHeatExchange(neighbor.FatBlock, _thruster, 1) / capacity;
-                            cumulativeNetworkHeatChange += neighborWithChange[neighbor];
-                        } else {
-                            insulatedNeihbors.Add(neighbor);
-                        }
-                    }
-                    else
-                    {
-                        neighborWithChange[neighbor] = HeatSession.Api.Utils.GetExchangeWithNeighbor(_thruster, neighbor.FatBlock, 1); // Assuming deltaTime of 1 second for display purposes
-                        cumulativeNeighborHeatChange += neighborWithChange[neighbor];
-                    }
-                }
-            }
+            var neighborStringBuilder = new StringBuilder();
+            float cumulativeNeighborHeatChange;
+            float cumulativeNetworkHeatChange;
+            AddNeighborAndNetworksInfo(_thruster, neighborStringBuilder, out cumulativeNeighborHeatChange, out cumulativeNetworkHeatChange);
+            float heatChange = GetHeatChange(1f) - cumulativeNeighborHeatChange - cumulativeNetworkHeatChange; // Assuming deltaTime of 1 second for display purposes
 
             builder.AppendLine($"--- Heat Management ---");
             builder.AppendLine($"Temperature: {heat:F2} °C");
-            builder.AppendLine($"Air Heat Change: {GetHeatChange(1):F2} °C/s");
+            string heatStatus = heatChange > 0 ? "Heating" : heatChange < -0.01 ? "Cooling" : "Stable";
+            builder.AppendLine($"Thermal Status: {heatStatus}");
+            builder.AppendLine($"Net Heat Change: {heatChange:+0.00;-0.00;0.00} °C/s");
             string exchangeMode = outputRatio > 0f ? "Active" : "Passive";
             builder.AppendLine($"Exchange Mode: {exchangeMode}");
             builder.AppendLine($"Thermal Capacity: {capacity / 1000000:F1} MJ/°C");
             builder.AppendLine($"Thrust output: {outputRatio * 100:F1} %");
             builder.AppendLine($"Ambient temp: {ambient:F1} °C");
             float windSpeed = HeatSession.Api.Utils.GetBlockWindSpeed(block);
-            builder.AppendLine($"Wind Speed: {windSpeed:F2} m/s");if (neighborList.Count > 0)
-            {
-                builder.AppendLine("");
-                builder.AppendLine($"Neighbors:");
-                foreach (var neighbor in neighborList)
-                {
-                    var neighborBlock = neighbor.FatBlock;
-                    if (neighborBlock != null)
-                    {
-                        if (!insulatedNeihbors.Contains(neighbor)) {
-                            builder.AppendLine($"- {neighborBlock.DisplayNameText} ({HeatSession.Api.Utils.GetHeat(neighborBlock):F2}°C) -> {neighborWithChange[neighbor]:F4} °C/s");
-                        } else {
-                            builder.AppendLine($"- {neighborBlock.DisplayNameText} ({HeatSession.Api.Utils.GetHeat(neighborBlock):F2}°C) !! Insulated");
-                        }                    }
-                }
-            }
-            if (connectedPipeNetworks.Count > 0)
-            {
-                builder.AppendLine("");
-                builder.AppendLine($"Pipe networks:");
-                foreach (var network in connectedPipeNetworks)
-                {
-                    network.AppendNetworkInfo(builder);
-                }
-            }
+            builder.AppendLine($"Wind Speed: {windSpeed:F2} m/s");
             builder.AppendLine($"------");
+            builder.AppendLine("");
+            builder.AppendLine("Heat Sources:");
+            builder.AppendLine($"  Air Exchange: {GetHeatChange(1):+0.00;-0.00;0.00} °C/s");
+            builder.Append(neighborStringBuilder);
         }
 
-        public float GetHeatChange(float deltaTime)
+        public override float GetHeatChange(float deltaTime)
         {
             if (_thruster == null)
                 return 0f;
@@ -144,7 +98,7 @@ namespace TSUT.HeatManagement
             return -change;
         }
 
-        public void Cleanup()
+        public override void Cleanup()
         {
             if (_thruster != null)
             {
@@ -153,15 +107,15 @@ namespace TSUT.HeatManagement
             }
         }
 
-        public void SpreadHeat(float deltaTime)
+        public override void SpreadHeat(float deltaTime)
         {
-            return; // Thrusters do not spread heat in this implementation
+            SpreadHeatStandard(_thruster, deltaTime);
         }
 
-        public void ReactOnNewHeat(float heat)
+        public override void ReactOnNewHeat(float heat)
         {
-            this._thruster.RefreshCustomInfo();
-            return; // No specific reaction needed for thrusters
+            _thruster.RefreshCustomInfo();
+            _thruster.SetDetailedInfoDirty();
         }
     }
 }

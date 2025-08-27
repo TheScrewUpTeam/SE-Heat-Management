@@ -21,7 +21,7 @@ namespace TSUT.HeatManagement
     {
         public HeatPipeNode A;
         public HeatPipeNode B;
-        public float Conductance = Config.Instance.HEATPIPE_CONDUCTIVITY * 30; // or resistance mult by 30 for faster heat expansion
+        public float Conductance = Config.Instance.HEATPIPE_CONDUCTIVITY * 100; // or resistance mult by 30 for faster heat expansion
     }
 
     public class HeatPipeManagerFactory : IHeatBehaviorFactory
@@ -648,9 +648,9 @@ namespace TSUT.HeatManagement
             // Use global pipe-to-block conductance config
             float conductance = Config.Instance.HEATPIPE_CONDUCTIVITY;
             float energyTransferred = tempDiff * contactArea * conductance * deltaTime;
-
+            
             // Return raw joules of heat
-            return -energyTransferred;
+            return energyTransferred;
         }
 
         public void SpreadHeat(float deltaTime)
@@ -842,6 +842,29 @@ namespace TSUT.HeatManagement
                     );
                 }
             }
+        }
+
+        public int GetNetworkSize()
+        {
+            return _nodes?.Count ?? 0;
+        }
+
+        public int GetNetworkHash()
+        {
+            return GetHashCode();
+        }
+
+        public float GetAverageTemperature()
+        {
+            if (_nodes == null || _nodes.Count == 0)
+                return 0f;
+
+            float totalTemp = 0f;
+            foreach (var node in _nodes)
+            {
+                totalTemp += HeatSession.Api.Utils.GetHeat(node.Block);
+            }
+            return totalTemp / _nodes.Count;
         }
     }
 

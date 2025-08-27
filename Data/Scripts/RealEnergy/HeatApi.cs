@@ -80,6 +80,8 @@ namespace TSUT.HeatManagement
         float GetExchangeWithNeighbor(IMyCubeBlock block, IMyCubeBlock neighbor, float deltaTime);
         float GetAirDensity(IMyCubeBlock block);
         float GetActiveExhaustHeatLoss(IMyExhaustBlock exhaust, float deltaTime);
+        float GetExchangeWithNetwork(IMyCubeBlock block, IMyCubeBlock networkBlock, float deltaTime);
+        float GetExchangeUniversal(IMyCubeBlock block, IMyCubeBlock neighborBlock, float deltaTime);
     }
 
     public interface IHeatEffects

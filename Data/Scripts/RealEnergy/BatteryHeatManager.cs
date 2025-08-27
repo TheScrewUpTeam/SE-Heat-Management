@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Sandbox.ModAPI;
 using VRage.Game;
@@ -41,7 +42,7 @@ namespace TSUT.HeatManagement
         public int Priority => 10; // Batteries first, since they are critical for heat management
     }
 
-    public class BatteryHeatManager : IHeatBehavior
+    public class BatteryHeatManager : AHeatBehavior
     {
         private IMyBatteryBlock _battery;
         private IGridHeatManager _gridManager;
@@ -62,7 +63,7 @@ namespace TSUT.HeatManagement
             float outputMW = battery.CurrentOutput + battery.CurrentInput; // Total power output in MW
 
             float tNorm = MathHelper.Clamp(HeatSession.Api.Utils.GetHeat(battery) / Config.Instance.CRITICAL_TEMP, 0f, 1f);
-            float resistanceMultiplier = MathHelper.Lerp(1f, 2f, tNorm * tNorm); // More exponential rise
+            float resistanceMultiplier = MathHelper.Lerp(1f, 1.2f, tNorm * tNorm); // More exponential rise
 
             float internalResistance = Config.Instance.DISCHARGE_HEAT_FRACTION * resistanceMultiplier;
 
@@ -89,7 +90,7 @@ namespace TSUT.HeatManagement
             return energyLoss / thermalCapacity; // °C lost
         }
 
-        public float GetHeatChange(float deltaTime)
+        public override float GetHeatChange(float deltaTime)
         {
             if (_battery == null)
                 return 0f;
@@ -100,7 +101,7 @@ namespace TSUT.HeatManagement
             return heatGain - heatLoss;
         }
 
-        public void Cleanup()
+        public override void Cleanup()
         {
             if (_battery != null)
             {
@@ -113,46 +114,13 @@ namespace TSUT.HeatManagement
         {
             float ownThermalCapacity = HeatSession.Api.Utils.GetThermalCapacity(block);
 
-            var connectedPipeNetworks = new List<HeatPipeManager>();
-            var neighborWithChange = new Dictionary<IMySlimBlock, float>();
-            var neighborList = new List<IMySlimBlock>();
-            var insulatedNeihbors = new List<IMySlimBlock>();
-            var networkedNeighbors = new List<IMySlimBlock>();
-            block.SlimBlock.GetNeighbours(neighborList);
-            float cumulativeNeighborHeatChange = 0f;
-            float cumulativeNetworkHeatChange = 0f;
-            if (neighborList.Count > 0)
-            {
-                foreach (var neighbor in neighborList)
-                {
-                    var behavior = _gridManager.TryGetHeatBehaviour(neighbor.FatBlock);
-                    if (behavior != null && behavior is HeatPipeManager)
-                    {
-                        var network = behavior as HeatPipeManager;
-                        if (HeatPipeManagerFactory.IsPipeConnectedToBlock(neighbor.FatBlock, _battery))
-                        {
-                            if (!connectedPipeNetworks.Contains(network))
-                            {
-                                connectedPipeNetworks.Add(network);
-                            }
-                            neighborWithChange[neighbor] = network.GetHeatExchange(neighbor.FatBlock, _battery, 1f) / ownThermalCapacity;
-                            cumulativeNetworkHeatChange += neighborWithChange[neighbor];
-                            networkedNeighbors.Add(neighbor);
-                        }
-                        else
-                        {
-                            insulatedNeihbors.Add(neighbor);
-                        }
-                    }
-                    else
-                    {
-                        neighborWithChange[neighbor] = HeatSession.Api.Utils.GetExchangeWithNeighbor(_battery, neighbor.FatBlock, 1); // Assuming deltaTime of 1 second for display purposes
-                        cumulativeNeighborHeatChange += neighborWithChange[neighbor];
-                    }
-                }
-            }
+            var neighborStringBuilder = new StringBuilder();
+            float cumulativeNeighborHeatChange;
+            float cumulativeNetworkHeatChange;
+            AddNeighborAndNetworksInfo(_battery, neighborStringBuilder, out cumulativeNeighborHeatChange, out cumulativeNetworkHeatChange);
+
             var heat = HeatSession.Api.Utils.GetHeat(block);
-            float heatChange = GetHeatChange(1f) + cumulativeNeighborHeatChange + cumulativeNetworkHeatChange; // Assuming deltaTime of 1 second for display purposes
+            float heatChange = GetHeatChange(1f) - cumulativeNeighborHeatChange - cumulativeNetworkHeatChange; // Assuming deltaTime of 1 second for display purposes
 
             info.AppendLine($"--- Heat Management ---");
             info.AppendLine($"Temperature: {heat:F2} °C");
@@ -190,40 +158,7 @@ namespace TSUT.HeatManagement
             info.AppendLine("Heat Sources:");
             info.AppendLine($"  Internal Use: {CalculateInternalHeatGain(block as IMyBatteryBlock, 1):F2} °C/s");
             info.AppendLine($"  Air Exchange: {-CalculateAmbientHeatLoss(block as IMyBatteryBlock, 1):+0.00;-0.00;0.00} °C/s");
-            info.AppendLine($"  Neighbor Block: {cumulativeNeighborHeatChange:+0.00;-0.00;0.00} °C/s");
-            info.AppendLine($"  Heat pipes: {cumulativeNetworkHeatChange:+0.00;-0.00;0.00} °C/s");
-
-            if (neighborList.Count > 0)
-            {
-                info.AppendLine("");
-                info.AppendLine($"Neighbors:");
-                foreach (var neighbor in neighborList)
-                {
-                    var neighborBlock = neighbor.FatBlock;
-                    if (neighborBlock != null)
-                    {
-                        if (!insulatedNeihbors.Contains(neighbor))
-                        {
-                            string networkText = networkedNeighbors.Contains(neighbor) ? "-NET-" : "";
-                            info.AppendLine($"- {neighborBlock.DisplayNameText}{networkText} ({HeatSession.Api.Utils.GetHeat(neighborBlock):F2}°C) -> {neighborWithChange[neighbor]:F4} °C/s");
-                        }
-                        else
-                        {
-                            info.AppendLine($"- {neighborBlock.DisplayNameText} ({HeatSession.Api.Utils.GetHeat(neighborBlock):F2}°C) !! Insulated");
-                        }
-                    }
-                }
-            }
-            if (connectedPipeNetworks.Count > 0)
-            {
-                info.AppendLine("");
-                info.AppendLine($"Pipe networks:");
-                foreach (var network in connectedPipeNetworks)
-                {
-                    network.AppendNetworkInfo(info);
-                }
-            }
-            info.AppendLine($"------");
+            info.Append(neighborStringBuilder);
         }
 
         void ExplodeBatteryInstantly(IMyBatteryBlock battery)
@@ -235,68 +170,12 @@ namespace TSUT.HeatManagement
             slimBlock.DoDamage(1000000f, MyDamageType.Explosion, true);
         }
 
-        public void SpreadHeat(float deltaTime)
+        public override void SpreadHeat(float deltaTime)
         {
-            if (_battery == null)
-                return;
-
-            float cumulativeHeat = 0f;
-            float tempA = HeatSession.Api.Utils.GetHeat(_battery);
-            float capacityA = HeatSession.Api.Utils.GetThermalCapacity(_battery);
-
-            var neighborList = new List<IMySlimBlock>();
-            _battery.SlimBlock.GetNeighbours(neighborList);
-
-            float energyTransferred = 0f;
-
-            foreach (var neighborSlim in neighborList)
-            {
-                var neighborFat = neighborSlim.FatBlock;
-                if (neighborFat == null)
-                    continue;
-                float capacityB = HeatSession.Api.Utils.GetThermalCapacity(neighborFat);
-                float tempB = HeatSession.Api.Utils.GetHeat(neighborFat);
-
-                var behaviour = _gridManager.TryGetHeatBehaviour(neighborFat);
-                if (behaviour != null && behaviour is HeatPipeManager)
-                {
-                    var network = behaviour as HeatPipeManager;
-                    energyTransferred = -network.GetHeatExchange(neighborFat, _battery, deltaTime);
-                }
-                else if (behaviour != null)
-                {
-                    continue;
-                }
-                else
-                {
-                    float tempDiff = tempA - tempB;
-
-                    float contactArea = HeatSession.Api.Utils.GetLargestFaceArea(neighborSlim);
-                    energyTransferred = tempDiff * Config.Instance.THERMAL_CONDUCTIVITY * contactArea * deltaTime; // Arbitrary scaling factor for transfer rate
-                }
-
-                // Convert energy to delta-T for each block
-                float deltaA = -energyTransferred / capacityA;
-                float deltaB = energyTransferred / capacityB;
-
-                float ambientLoss = 0f;
-
-                if (behaviour == null)
-                {
-                    // Apply ambient heat exchange for non-vent, non-battery blocks
-                    ambientLoss = HeatSession.Api.Utils.GetAmbientHeatLoss(neighborFat, deltaTime);
-                }
-
-                float newTemp = tempB + deltaB - ambientLoss;
-                HeatSession.Api.Utils.SetHeat(neighborFat, newTemp);
-                HeatSession.Api.Effects.UpdateBlockHeatLight(neighborFat, newTemp);
-
-                cumulativeHeat += deltaA;
-            }
-            HeatSession.Api.Utils.SetHeat(_battery, tempA + cumulativeHeat);
+           SpreadHeatStandard(_battery, deltaTime);
         }
 
-        public void ReactOnNewHeat(float heat)
+        public override void ReactOnNewHeat(float heat)
         {
             _battery.SetDetailedInfoDirty();
             _battery.RefreshCustomInfo();

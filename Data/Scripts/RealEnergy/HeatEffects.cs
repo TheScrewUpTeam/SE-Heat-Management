@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Sandbox.Game;
 using Sandbox.Game.Lights;
 using VRage.Game;
 using VRage.Game.ModAPI;
@@ -55,10 +56,12 @@ namespace TSUT.HeatManagement
             else
             {
                 // Normalize delta for glow (e.g., 0°C = no glow, 100°C above ambient = max glow)
-                float normalizedDelta = MathHelper.Clamp(delta / 50f, 0f, 1f);
+                float normalizedDelta = MathHelper.Clamp(delta / 100f, 0f, 1f);
                 light.Intensity = normalizedDelta * 50f;  // adjust max brightness as needed
                 light.Color = Color.Lerp(Color.Black, Color.OrangeRed, normalizedDelta);
             }
+
+            // MyVisualScriptLogicProvider.SetHighlightLocal(block.Name, 3, 300, light.Color);
 
             // Update light position (in case block moves)
             light.Position = block.GetPosition() + block.WorldMatrix.Up * 0.2f;
