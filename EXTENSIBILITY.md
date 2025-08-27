@@ -2,6 +2,8 @@
 
 This guide explains how 3rd party modders can integrate with the Heat Management System (HMS) mod for Space Engineers. You only need to include the `HmsApiV1.0.cs` file in your own mod project to get started.
 
+Current API Version: 1.0.1
+
 ---
 
 ## 1. Getting Started
@@ -38,8 +40,21 @@ private void OnHmsReady()
 Access heat-related calculations and queries via `_hmsApi.Utils` (see `IHeatUtils` interface for all available methods):
 
 ```csharp
+// Basic heat operations
 float heat = _hmsApi.Utils.GetHeat(block);
 _hmsApi.Utils.SetHeat(block, 100f);
+// OR
+float newHeat = _hmsApi.Utils.ApplyHeatChange(block, 50f);
+
+// Environmental queries
+float ambientTemp = _hmsApi.Utils.CalculateAmbientTemperature(block);
+float airDensity = _hmsApi.Utils.GetAirDensity(block);
+float windSpeed = _hmsApi.Utils.GetBlockWindSpeed(block);
+bool isPressurized = _hmsApi.Utils.IsBlockInPressurizedRoom(block);
+
+// Heat exchange calculations
+float exchangeAmount = _hmsApi.Utils.GetExchangeUniversal(block, neighborBlock, deltaTime);
+var networkData = _hmsApi.Utils.GetNetworkData(block);
 ```
 
 ### Effects
@@ -52,7 +67,24 @@ _hmsApi.Effects.InstantiateSmoke(batteryBlock);
 
 ---
 
-## 4. Registering Custom Heat Behaviors
+## 4. Heat Network Integration
+
+The HMS now includes support for heat networks (like heat pipes). You can query network data and calculate heat exchange between blocks in the network:
+
+```csharp
+// Get heat network data for a block
+var networkData = _hmsApi.Utils.GetNetworkData(block);
+if (networkData != null)
+{
+    // Block is part of a heat network
+    var networkSize = networkData.length;
+}
+
+// Calculate heat exchange considering both direct contact and network connections
+float exchangeAmount = _hmsApi.Utils.GetExchangeUniversal(block, otherBlock, deltaTime);
+```
+
+## 5. Registering Custom Heat Behaviors
 
 To add your own heat logic for specific blocks, use `RegisterHeatBehaviorFactory`:
 
