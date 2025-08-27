@@ -8,8 +8,10 @@ This mod brings a whole new layer of engineering challenge to your grids: **HEAT
 
 ## What Does This Mod Do?
 
-- **Adds heat simulation** to batteries, thrusters, and vents.
+- **Adds heat simulation** to batteries, thrusters, vents, and exhaust blocks.
 - **Blocks generate, transfer, and lose heat** based on their activity and environment.
+- **Heat networks** allow efficient heat transfer through specialized heat pipes.
+- **Visual feedback** with configurable heat glow and smoke effects.
 - **Overheating batteries?** Watch out—they might just go out with a bang! 💥
 - **Vents and thrusters** can help cool things down, but you'll need to manage your grid's thermal balance.
 - **Neighboring blocks** exchange heat, so your ship's design really matters!
@@ -19,10 +21,13 @@ This mod brings a whole new layer of engineering challenge to your grids: **HEAT
 
 ## Features
 
-- **Realistic(ish) heat transfer** between blocks and the environment.
-- **Visual feedback:** Glowing lights and smoke effects for hot blocks.
+- **Realistic(ish) heat transfer** between blocks and through heat networks.
+- **Visual feedback:** Configurable heat glow and smoke effects for hot blocks.
+- **Heat pipe networks** for efficient thermal management across your grid.
 - **Per-save config file:** Tweak the mod's behavior for each world.
-- **Exploding batteries** if you ignore the laws of thermodynamics.  
+- **Auto-updating config** system that preserves your settings during updates.
+- **Enhanced battery management** with configurable discharge heat settings.
+- **Exploding batteries** if you ignore the laws of thermodynamics.
 - **Fun for engineers, masochists, and anyone who thinks vanilla is too easy.**
 
 ---
@@ -43,14 +48,24 @@ See the [Configuration Guide](CONFIGURATION.md) for detailed instructions on all
 
 - The config file is saved as `TSUT_HeatManagement_Config.xml` in your world's Storage folder.
 - You can change heat coefficients, critical temperatures, and more.
-- **New:** `LIMIT_TO_PLAYER_GRIDS` (true/false) — If true, the mod will only apply heat simulation to grids owned by the local player. The mod will now automatically enable or disable heat management for grids as you take or lose ownership, without requiring a reload.
+- **Auto-updating config** system that preserves your settings while keeping the mod up to date.
+- **New features:**
+  - `HEAT_GLOW_INDICATION` (true/false) — Toggle visual heat glow effects.
+  - `DISCHARGE_HEAT_CONFIGURABLE` (true/false) — Enable custom heat settings for battery discharge.
+  - `HEATPIPE_CONDUCTIVITY` — Control the efficiency of heat pipe networks.
 - The mod will always use the config from your current save, so each world can have its own heat rules.
 
 ---
 
 # Extensibility
 
-This mod is now fully extensible! 3rd party developers can integrate their own heat logic, effects, and custom behaviors using the provided API.
+This mod is now fully extensible! 3rd party developers can integrate their own heat logic, effects, and custom behaviors using the provided API (v1.0.1).
+
+Key features for modders:
+- Easy integration with just one file (`HmsApiV1.0.cs`)
+- Heat network support for advanced thermal management
+- Comprehensive utility functions for heat calculations
+- Visual effects API for custom heat indicators
 
 For a complete integration guide and examples, see [EXTENSIBILITY.md](./EXTENSIBILITY.md).
 
