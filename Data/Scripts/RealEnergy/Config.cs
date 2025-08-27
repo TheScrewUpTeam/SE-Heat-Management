@@ -1,6 +1,7 @@
 using Sandbox.ModAPI;
 using System;
 using System.Linq.Expressions;
+using VRage.Utils;
 
 namespace TSUT.HeatManagement
 {
@@ -14,7 +15,7 @@ namespace TSUT.HeatManagement
 
         public static string HeatDebugString = "HeatDebug";
 
-        public string HEAT_SYSTEM_VERSION = "1.2.1";
+        public string HEAT_SYSTEM_VERSION = "1.2.2";
         public bool HEAT_SYSTEM_AUTO_UPDATE = true;
         public float HEAT_COOLDOWN_COEFF { get; set; } = 20f;
         public float HEAT_RADIATION_COEFF { get; set; } = 5f;
@@ -54,13 +55,35 @@ namespace TSUT.HeatManagement
                     {
                         contents = reader.ReadToEnd();
                     }
+                    
+                    // Check if version exists in the XML before deserializing
+                    bool hasVersion = contents.Contains("<HEAT_SYSTEM_VERSION>");
+
                     config = MyAPIGateway.Utilities.SerializeFromXML<Config>(contents);
+
+                    var defaultConfig = new Config();
+
+                    var configUpdateNeeded = !hasVersion || config.HEAT_SYSTEM_AUTO_UPDATE && config.HEAT_SYSTEM_VERSION != defaultConfig.HEAT_SYSTEM_VERSION;
+
+                    MyLog.Default.WriteLine($"[HeatManagement] AutoUpdate: {config.HEAT_SYSTEM_AUTO_UPDATE}, VersionMatches: {hasVersion && config.HEAT_SYSTEM_VERSION == defaultConfig.HEAT_SYSTEM_VERSION}, UpdateNeeded: {configUpdateNeeded}");
+
+                    // Check version and auto-update if needed
+                    if (configUpdateNeeded)
+                    {
+                        MyAPIGateway.Utilities.ShowMessage("HeatManagement", $"Config version mismatch. Auto-updating from {(hasVersion ? config.HEAT_SYSTEM_VERSION : "Unknown")} to {defaultConfig.HEAT_SYSTEM_VERSION}");
+                        // Keep auto-update setting but reset everything else to defaults
+                        bool autoUpdate = config.HEAT_SYSTEM_AUTO_UPDATE;
+                        config = new Config();
+                        config.HEAT_SYSTEM_AUTO_UPDATE = autoUpdate;
+                        return config;
+                    }
                 }
                 catch (Exception e)
                 {
                     MyAPIGateway.Utilities.ShowMessage("HeatManagement", $"Failed to load config, using defaults. {e.Message}");
                 }
             }
+
             return config;
         }
 

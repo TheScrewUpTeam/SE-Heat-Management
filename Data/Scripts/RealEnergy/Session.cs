@@ -48,9 +48,6 @@ namespace TSUT.HeatManagement
             // Load config (will use defaults if file doesn't exist)
             Config = Config.Instance;
 
-            // Try load config
-            Config.Load();
-
             _heatApi.Registry.RegisterHeatBehaviorFactory(new BatteryHeatManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new VentHeatManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new ExhaustHeatManagerFactory());
