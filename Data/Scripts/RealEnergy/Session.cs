@@ -10,6 +10,7 @@ using System.Linq;
 using System;
 using SpaceEngineers.Game.ModAPI;
 using Sandbox.Game.Entities;
+using System.Runtime.Remoting.Messaging;
 
 
 namespace TSUT.HeatManagement
@@ -480,6 +481,26 @@ namespace TSUT.HeatManagement
                             MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock,
                             MyAPIGateway.Entities.GetEntityById(neighborBlockId) as IMyCubeBlock,
                             dt))
+                },
+                {
+                    "GetHmsConfig", new Func<object>(() => 
+                        new Dictionary<string, object> {
+                            { "HEAT_COOLDOWN_COEFF", Config.Instance.HEAT_COOLDOWN_COEFF },
+                            { "HEAT_RADIATION_COEFF", Config.Instance.HEAT_RADIATION_COEFF },
+                            { "DISCHARGE_HEAT_FRACTION", Config.Instance.DISCHARGE_HEAT_FRACTION },
+                            { "THERMAL_CONDUCTIVITY", Config.Instance.THERMAL_CONDUCTIVITY },
+                            { "VENT_COOLING_RATE", Config.Instance.VENT_COOLING_RATE },
+                            { "THRUSTER_COOLING_RATE", Config.Instance.THRUSTER_COOLING_RATE },
+                            { "CRITICAL_TEMP", Config.Instance.CRITICAL_TEMP },
+                            { "WIND_COOLING_MULT", Config.Instance.WIND_COOLING_MULT },
+                            { "HEATPIPE_CONDUCTIVITY", Config.Instance.HEATPIPE_CONDUCTIVITY },
+                            { "EXHAUST_HEAT_REJECTION_RATE", Config.Instance.EXHAUST_HEAT_REJECTION_RATE },
+                            { "LIMIT_TO_PLAYER_GRIDS", Config.Instance.LIMIT_TO_PLAYER_GRIDS },
+                            { "HEAT_GLOW_INDICATION", Config.Instance.HEAT_GLOW_INDICATION },
+                            { "HEAT_SYSTEM_VERSION", Config.Instance.HEAT_SYSTEM_VERSION },
+                            { "HEAT_SYSTEM_AUTO_UPDATE", Config.Instance.HEAT_SYSTEM_AUTO_UPDATE }
+                        }
+                    )
                 }
             };
         }
@@ -498,7 +519,10 @@ namespace TSUT.HeatManagement
                 WIND_COOLING_MULT = Config.Instance.WIND_COOLING_MULT,
                 HEATPIPE_CONDUCTIVITY = Config.Instance.HEATPIPE_CONDUCTIVITY,
                 EXHAUST_HEAT_REJECTION_RATE = Config.Instance.EXHAUST_HEAT_REJECTION_RATE,
-                LIMIT_TO_PLAYER_GRIDS = Config.Instance.LIMIT_TO_PLAYER_GRIDS
+                LIMIT_TO_PLAYER_GRIDS = Config.Instance.LIMIT_TO_PLAYER_GRIDS,
+                HEAT_GLOW_INDICATION = Config.Instance.HEAT_GLOW_INDICATION,
+                HEAT_SYSTEM_VERSION = Config.Instance.HEAT_SYSTEM_VERSION,
+                HEAT_SYSTEM_AUTO_UPDATE = Config.Instance.HEAT_SYSTEM_AUTO_UPDATE
             };
 
             networking.SendToPlayer(message, request.SenderId);
@@ -517,6 +541,9 @@ namespace TSUT.HeatManagement
             Config.Instance.HEATPIPE_CONDUCTIVITY = heatConfigResponse.HEATPIPE_CONDUCTIVITY;
             Config.Instance.EXHAUST_HEAT_REJECTION_RATE = heatConfigResponse.EXHAUST_HEAT_REJECTION_RATE;
             Config.Instance.LIMIT_TO_PLAYER_GRIDS = heatConfigResponse.LIMIT_TO_PLAYER_GRIDS;
+            Config.Instance.HEAT_GLOW_INDICATION = heatConfigResponse.HEAT_GLOW_INDICATION;
+            Config.Instance.HEAT_SYSTEM_VERSION = heatConfigResponse.HEAT_SYSTEM_VERSION;
+            Config.Instance.HEAT_SYSTEM_AUTO_UPDATE = heatConfigResponse.HEAT_SYSTEM_AUTO_UPDATE;
         }
     }
 }

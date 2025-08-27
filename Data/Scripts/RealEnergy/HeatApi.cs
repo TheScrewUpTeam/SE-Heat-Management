@@ -113,4 +113,22 @@ namespace TSUT.HeatManagement
             Effects = new HeatEffects();
         }
     }
+
+    public interface IConfig
+    {
+        float HEAT_COOLDOWN_COEFF { get; set; }
+        float HEAT_RADIATION_COEFF { get; set; }
+        float DISCHARGE_HEAT_FRACTION { get; set; }
+        bool DISCHARGE_HEAT_CONFIGURABLE { get; set; }
+        float THERMAL_CONDUCTIVITY { get; set; }
+        float VENT_COOLING_RATE { get; set; }
+        float THRUSTER_COOLING_RATE { get; set; }
+        float CRITICAL_TEMP { get; set; }
+        float SMOKE_TRESHOLD { get; }
+        float WIND_COOLING_MULT { get; set; }
+        bool LIMIT_TO_PLAYER_GRIDS { get; set; }
+        float HEATPIPE_CONDUCTIVITY { get; set; }
+        float EXHAUST_HEAT_REJECTION_RATE { get; set; }
+        bool HEAT_GLOW_INDICATION { get; set; }
+    }
 }

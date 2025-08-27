@@ -5,7 +5,7 @@ using VRage.Utils;
 
 namespace TSUT.HeatManagement
 {
-    public class Config
+    public class Config : IConfig
     {
         public static string Version = "1.2.1";
         public static ushort HeatSyncMessageId = 7949; // Choose any unused ushort value
@@ -20,6 +20,7 @@ namespace TSUT.HeatManagement
         public float HEAT_COOLDOWN_COEFF { get; set; } = 20f;
         public float HEAT_RADIATION_COEFF { get; set; } = 5f;
         public float DISCHARGE_HEAT_FRACTION { get; set; } = 0.20f;
+        public bool DISCHARGE_HEAT_CONFIGURABLE { get; set; } = false;
         public float THERMAL_CONDUCTIVITY { get; set; } = 500f;
         public float VENT_COOLING_RATE { get; set; } = 5000f;
         public float THRUSTER_COOLING_RATE { get; set; } = 35000f;
@@ -29,6 +30,7 @@ namespace TSUT.HeatManagement
         public bool LIMIT_TO_PLAYER_GRIDS { get; set; } = false;
         public float HEATPIPE_CONDUCTIVITY { get; set; } = 3000f;
         public float EXHAUST_HEAT_REJECTION_RATE { get; set; } = 5000f; // Used for exhaust block heat rejection rate
+        public bool HEAT_GLOW_INDICATION { get; set; } = true;
 
         private static Config _instance;
         private const string CONFIG_FILE = "TSUT_HeatManagement_Config.xml";
@@ -55,7 +57,7 @@ namespace TSUT.HeatManagement
                     {
                         contents = reader.ReadToEnd();
                     }
-                    
+
                     // Check if version exists in the XML before deserializing
                     bool hasVersion = contents.Contains("<HEAT_SYSTEM_VERSION>");
 

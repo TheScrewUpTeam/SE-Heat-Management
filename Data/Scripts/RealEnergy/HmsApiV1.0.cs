@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
+using Sandbox.Engine.Multiplayer;
 using Sandbox.Game.Entities;
 using Sandbox.ModAPI;
 using SpaceEngineers.Game.ModAPI;
@@ -194,6 +196,14 @@ namespace TSUT.HeatManagement
             /// Returns 0 if the blocks are not connected in any way.
             /// </summary>
             float GetExchangeUniversal(IMyCubeBlock block, IMyCubeBlock neighborBlock, float deltaTime);
+
+            /// <summary>
+            /// Retrieves the current heat management system configuration.
+            /// Contains all the configurable parameters that control the behavior of the heat system,
+            /// such as cooling rates, conductivity values, and various behavioral flags.
+            /// </summary>
+            /// <returns>The current heat management system configuration.</returns>
+            HmsConfig GetHmsConfig();
         }
 
         public struct HeatNetworkData
@@ -224,6 +234,97 @@ namespace TSUT.HeatManagement
             /// Updates the positions of all heat-related lights in the scene.
             /// </summary>
             void UpdateLightsPosition();
+        }
+
+        
+
+        public class HmsConfig
+        {
+            /// <summary>
+            /// The version of the heat management system configuration.
+            /// Used for config versioning and updates.
+            /// </summary>
+            public string HEAT_SYSTEM_VERSION { get; set; }
+
+            /// <summary>
+            /// Controls whether the configuration should automatically update when a new version is detected.
+            /// If true, the config will be reset to defaults when version mismatch is detected.
+            /// </summary>
+            public bool HEAT_SYSTEM_AUTO_UPDATE { get; set; }
+
+            /// <summary>
+            /// Controls how quickly heat dissipates from blocks into the atmosphere.
+            /// Increase for faster cooling, decrease for slower cooling.
+            /// </summary>
+            public float HEAT_COOLDOWN_COEFF { get; set; }
+
+            /// <summary>
+            /// Controls how much heat is radiated into space from blocks.
+            /// Higher values mean more heat is lost to space.
+            /// </summary>
+            public float HEAT_RADIATION_COEFF { get; set; }
+
+            /// <summary>
+            /// The fraction of energy discharged from batteries that is converted into heat.
+            /// Raise to make batteries generate more heat per discharge.
+            /// </summary>
+            public float DISCHARGE_HEAT_FRACTION { get; set; }
+
+            /// <summary>
+            /// Controls whether the discharge heat fraction can be configured by users.
+            /// </summary>
+            public bool DISCHARGE_HEAT_CONFIGURABLE { get; set; }
+
+            /// <summary>
+            /// Governs how efficiently heat spreads between connected blocks.
+            /// Higher values mean heat equalizes faster across the grid.
+            /// </summary>
+            public float THERMAL_CONDUCTIVITY { get; set; }
+
+            /// <summary>
+            /// The amount of heat removed per tick by a vent.
+            /// Increase to make vents more effective at cooling.
+            /// </summary>
+            public float VENT_COOLING_RATE { get; set; }
+
+            /// <summary>
+            /// The amount of heat removed per tick by thrusters.
+            /// Increase to make thrusters more effective at cooling themselves.
+            /// </summary>
+            public float THRUSTER_COOLING_RATE { get; set; }
+
+            /// <summary>
+            /// The temperature at which heat source blocks are considered overheated and may explode.
+            /// </summary>
+            public float CRITICAL_TEMP { get; set; }
+
+            /// <summary>
+            /// Modifies how much wind (planetary atmosphere) helps cool blocks.
+            /// Increase for stronger wind cooling effects.
+            /// </summary>
+            public float WIND_COOLING_MULT { get; set; }
+
+            /// <summary>
+            /// If true, only grids owned by players are affected by the heat system.
+            /// Set to false to include all grids.
+            /// </summary>
+            public bool LIMIT_TO_PLAYER_GRIDS { get; set; }
+
+            /// <summary>
+            /// Controls how efficiently heat pipes transfer heat between connected blocks.
+            /// Higher values mean heat pipes are more effective at heat transfer.
+            /// </summary>
+            public float HEATPIPE_CONDUCTIVITY { get; set; }
+
+            /// <summary>
+            /// Controls the rate at which exhaust blocks reject heat to the environment (joules/second).
+            /// </summary>
+            public float EXHAUST_HEAT_REJECTION_RATE { get; set; }
+
+            /// <summary>
+            /// Controls whether blocks should visually glow when they heat up.
+            /// </summary>
+            public bool HEAT_GLOW_INDICATION { get; set; }
         }
 
         public abstract class AHeatBehavior
@@ -279,44 +380,151 @@ namespace TSUT.HeatManagement
             /// <param name="heat">The new heat value of the block.</param>
             abstract public void ReactOnNewHeat(float heat);
 
-            internal void SpreadHeatStandard(float deltaTime, IMyCubeBlock block, HmsApi api)
+            internal void AddNeighborAndNetworksInfo(
+               IMyCubeBlock block,
+               HmsApi api,
+               StringBuilder info,
+               out float cumulativeNeighborHeatChange,
+               out float cumulativeNetworkHeatChange
+           )
             {
                 var temperatureChange = 0f;
-                var heatExchangeWithNeighbors = CalculateNeighborExchangeStandard(deltaTime, block, api, ref temperatureChange);
-                foreach (var kvm in heatExchangeWithNeighbors)
+                Dictionary<IMyCubeBlock, float> neighborList;
+                Dictionary<IMyCubeBlock, float> networkList;
+                Dictionary<IMyCubeBlock, HeatNetworkData> neighborNetworkData;
+                CalculateNeighborExchangeStandard(
+                    1,
+                    block,
+                    api,
+                    ref temperatureChange,
+                    out cumulativeNeighborHeatChange,
+                    out cumulativeNetworkHeatChange,
+                    out neighborList,
+                    out networkList,
+                    out neighborNetworkData
+                    );
+
+                info.AppendLine($"  Neighbor Block: {cumulativeNeighborHeatChange:+0.00;-0.00;0.00} °C/s");
+                info.AppendLine($"  Heat pipes: {cumulativeNetworkHeatChange:+0.00;-0.00;0.00} °C/s");
+
+                if (neighborList.Count > 0)
+                {
+                    info.AppendLine("");
+                    info.AppendLine($"Neighbors:");
+                    foreach (var kvp in neighborList)
+                    {
+                        var neighbor = kvp.Key;
+                        var tempChange = kvp.Value;
+                        info.AppendLine($"- {neighbor.DisplayNameText} ({api.Utils.GetHeat(neighbor):F2}°C) -> {tempChange:F4} °C/s");
+                    }
+                    foreach (var kvp in networkList)
+                    {
+                        var neighbor = kvp.Key;
+                        var tempChange = kvp.Value;
+                        info.AppendLine($"- {neighbor.DisplayNameText}-NET- ({api.Utils.GetHeat(neighbor):F2}°C) -> {tempChange:F4} °C/s");
+                    }
+                }
+                if (networkList.Count > 0)
+                {
+                    info.AppendLine("");
+                    info.AppendLine($"Pipe networks:");
+                    foreach (var kvp in networkList)
+                    {
+                        var networkBlock = kvp.Key;
+                        var networkData = neighborNetworkData[networkBlock];
+                        info.AppendLine($"- #{networkData.hash} Length: {networkData.length}, Avg: {networkData.averageTemperature:F1} °C");
+                    }
+                }
+            }
+
+            internal float SpreadHeatStandard(float deltaTime, IMyCubeBlock block, HmsApi api)
+            {
+                var temperatureChange = 0f;
+                float neighborCumulative;
+                float networkCumulative;
+                Dictionary<IMyCubeBlock, float> neighborList;
+                Dictionary<IMyCubeBlock, float> networkList;
+                Dictionary<IMyCubeBlock, HeatNetworkData> neighborNetworkData;
+                CalculateNeighborExchangeStandard(
+                    deltaTime,
+                    block,
+                    api,
+                    ref temperatureChange,
+                    out neighborCumulative,
+                    out networkCumulative,
+                    out neighborList,
+                    out networkList,
+                    out neighborNetworkData
+                    );
+                foreach (var kvm in neighborList)
                 {
                     var neighbor = kvm.Key;
                     var tempChange = kvm.Value;
                     var neighborTemp = api.Utils.GetHeat(neighbor);
-                    api.Utils.SetHeat(neighbor, neighborTemp + tempChange);
+                    var newTemp = neighborTemp + tempChange;
+                    api.Utils.SetHeat(neighbor, newTemp);
+                }
+                foreach (var kvm in networkList)
+                {
+                    var neighbor = kvm.Key;
+                    var tempChange = kvm.Value;
+                    var neighborTemp = api.Utils.GetHeat(neighbor);
+                    var newTemp = neighborTemp + tempChange;
+                    api.Utils.SetHeat(neighbor, newTemp);
                 }
 
                 var ownTemperature = api.Utils.GetHeat(block);
                 api.Utils.SetHeat(block, ownTemperature + temperatureChange);
+                return ownTemperature + temperatureChange;
             }
 
-            public Dictionary<IMyCubeBlock, float> CalculateNeighborExchangeStandard(float deltaTime, IMyCubeBlock block, HmsApi api, ref float ownHeatChange)
+            public void CalculateNeighborExchangeStandard(
+                float deltaTime,
+                IMyCubeBlock block,
+                HmsApi api,
+                ref float ownHeatChange,
+                out float neighborCumulative,
+                out float networkCumulative,
+                out Dictionary<IMyCubeBlock, float> neighborBlocks,
+                out Dictionary<IMyCubeBlock, float> neighborNetworks,
+                out Dictionary<IMyCubeBlock, HeatNetworkData> neighborNetworkData
+            )
             {
+                neighborBlocks = new Dictionary<IMyCubeBlock, float>();
+                neighborNetworks = new Dictionary<IMyCubeBlock, float>();
+                neighborNetworkData = new Dictionary<IMyCubeBlock, HeatNetworkData>();
+                neighborCumulative = 0f;
+                networkCumulative = 0f;
+
                 var neighborList = new List<IMySlimBlock>();
                 block.SlimBlock.GetNeighbours(neighborList);
 
-                var result = new Dictionary<IMyCubeBlock, float>();
                 float energyTransferred = 0f;
+                var ownCapacity = api.Utils.GetThermalCapacity(block);
 
                 foreach (var neighborSlim in neighborList)
                 {
                     var neighborFat = neighborSlim.FatBlock;
                     if (neighborFat == null)
                         continue;
+                    var netwrorkData = api.Utils.GetNetworkData(neighborFat);
                     var capacity = api.Utils.GetThermalCapacity(neighborFat);
-                    var transfer = api.Utils.GetExchangeWithNeighbor(block, neighborFat, deltaTime) * capacity;
-                    result.Add(neighborFat, -transfer / capacity);
-                    energyTransferred += transfer;
+                    var transfer = api.Utils.GetExchangeUniversal(block, neighborFat, deltaTime);
+                    if (netwrorkData != null)
+                    {
+                        neighborNetworks.Add(neighborFat, transfer / capacity);
+                        neighborNetworkData.Add(neighborFat, (HeatNetworkData)netwrorkData);
+                        networkCumulative = -transfer / ownCapacity;
+                    }
+                    else
+                    {
+                        neighborBlocks.Add(neighborFat, transfer / capacity);
+                        neighborCumulative = -transfer / ownCapacity;
+                    }
+                    energyTransferred -= transfer;
                 }
 
-                var ownCapacity = api.Utils.GetThermalCapacity(block);
                 ownHeatChange = energyTransferred / ownCapacity;
-                return result;
             }
         }
 
@@ -676,6 +884,40 @@ namespace TSUT.HeatManagement
                     return fn(block?.EntityId ?? 0, neighborBlock?.EntityId ?? 0, deltaTime);
                 }
                 return 0f;
+            }
+
+            public HmsConfig GetHmsConfig()
+            {
+                object method;
+                if (client.TryGetValue("GetHmsConfig", out method) && method is Func<object>)
+                {
+                    var fn = (Func<object>)method;
+                    var result = fn();
+                    var config = new HmsConfig();
+                    if (result is IDictionary<string, object>)
+                    {
+                        var dict = result as IDictionary<string, object>;
+                        object value;
+                        if (dict.TryGetValue("HEAT_SYSTEM_VERSION", out value) && value is string) config.HEAT_SYSTEM_VERSION = (string)value;
+                        if (dict.TryGetValue("HEAT_SYSTEM_AUTO_UPDATE", out value) && value is bool) config.HEAT_SYSTEM_AUTO_UPDATE = (bool)value;
+                        if (dict.TryGetValue("HEAT_COOLDOWN_COEFF", out value) && value is float) config.HEAT_COOLDOWN_COEFF = (float)value;
+                        if (dict.TryGetValue("HEAT_RADIATION_COEFF", out value) && value is float) config.HEAT_RADIATION_COEFF = (float)value;
+                        if (dict.TryGetValue("DISCHARGE_HEAT_FRACTION", out value) && value is float) config.DISCHARGE_HEAT_FRACTION = (float)value;
+                        if (dict.TryGetValue("DISCHARGE_HEAT_CONFIGURABLE", out value) && value is bool) config.DISCHARGE_HEAT_CONFIGURABLE = (bool)value;
+                        if (dict.TryGetValue("THERMAL_CONDUCTIVITY", out value) && value is float) config.THERMAL_CONDUCTIVITY = (float)value;
+                        if (dict.TryGetValue("VENT_COOLING_RATE", out value) && value is float) config.VENT_COOLING_RATE = (float)value;
+                        if (dict.TryGetValue("THRUSTER_COOLING_RATE", out value) && value is float) config.THRUSTER_COOLING_RATE = (float)value;
+                        if (dict.TryGetValue("CRITICAL_TEMP", out value) && value is float) config.CRITICAL_TEMP = (float)value;
+                        if (dict.TryGetValue("WIND_COOLING_MULT", out value) && value is float) config.WIND_COOLING_MULT = (float)value;
+                        if (dict.TryGetValue("LIMIT_TO_PLAYER_GRIDS", out value) && value is bool) config.LIMIT_TO_PLAYER_GRIDS = (bool)value;
+                        if (dict.TryGetValue("HEATPIPE_CONDUCTIVITY", out value) && value is float) config.HEATPIPE_CONDUCTIVITY = (float)value;
+                        if (dict.TryGetValue("EXHAUST_HEAT_REJECTION_RATE", out value) && value is float) config.EXHAUST_HEAT_REJECTION_RATE = (float)value;
+                        if (dict.TryGetValue("HEAT_GLOW_INDICATION", out value) && value is bool) config.HEAT_GLOW_INDICATION = (bool)value;
+                        
+                    }
+                    return config;
+                }
+                return null;
             }
         }
 

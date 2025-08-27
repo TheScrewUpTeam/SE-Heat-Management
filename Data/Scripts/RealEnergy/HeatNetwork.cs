@@ -137,6 +137,13 @@ namespace TSUT.HeatManagement
         [ProtoMember(11)]
         public float EXHAUST_HEAT_REJECTION_RATE;
 
+        [ProtoMember(12)]
+        public bool HEAT_GLOW_INDICATION;
+        [ProtoMember(13)]
+        public string HEAT_SYSTEM_VERSION;
+        [ProtoMember(14)]
+        public bool HEAT_SYSTEM_AUTO_UPDATE;
+
         public override bool Received()
         {
             HeatSession.UpdateHeatConfig(this);

@@ -36,6 +36,10 @@ namespace TSUT.HeatManagement
         // Call once per tick for each battery with current heat
         public void UpdateBlockHeatLight(IMyCubeBlock block, float heat)
         {
+            if (!Config.Instance.HEAT_GLOW_INDICATION)
+            {
+                return;
+            }
             MyLight light;
             if (!_lights.TryGetValue(block, out light))
             {

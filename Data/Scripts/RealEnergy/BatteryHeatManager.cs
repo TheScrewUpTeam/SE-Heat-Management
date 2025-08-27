@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
+using Sandbox.Definitions;
 using Sandbox.ModAPI;
 using VRage.Game;
 using VRage.Game.ModAPI;
@@ -59,13 +60,21 @@ namespace TSUT.HeatManagement
             if (battery == null)
                 return 0f;
 
+            float powerToHeatRatio = Config.Instance.DISCHARGE_HEAT_FRACTION;
+
+            if (!Config.Instance.DISCHARGE_HEAT_CONFIGURABLE)
+            {
+                var def = battery.SlimBlock.BlockDefinition as MyBatteryBlockDefinition;
+                powerToHeatRatio = 1 - def.RechargeMultiplier;
+            }
+
             float thermalCapacity = HeatSession.Api.Utils.GetThermalCapacity(battery);
             float outputMW = battery.CurrentOutput + battery.CurrentInput; // Total power output in MW
 
             float tNorm = MathHelper.Clamp(HeatSession.Api.Utils.GetHeat(battery) / Config.Instance.CRITICAL_TEMP, 0f, 1f);
             float resistanceMultiplier = MathHelper.Lerp(1f, 1.2f, tNorm * tNorm); // More exponential rise
 
-            float internalResistance = Config.Instance.DISCHARGE_HEAT_FRACTION * resistanceMultiplier;
+            float internalResistance = powerToHeatRatio * resistanceMultiplier;
 
             float heatEnergy = outputMW * 1000000f * deltaTime * internalResistance; // MW to Watts (J/s) * seconds = Joules
             float heatGain = heatEnergy / thermalCapacity; // J / (J/°C) = °C
