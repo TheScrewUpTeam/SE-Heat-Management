@@ -655,6 +655,7 @@ namespace TSUT.HeatManagement
 
         public void SpreadHeat(float deltaTime)
         {
+            MyLog.Default.WriteLine($"Strt precessing net #{GetHashCode()}...");
             foreach (var node in _nodes)
             {
                 foreach (var edge in node.Connections)
@@ -671,7 +672,20 @@ namespace TSUT.HeatManagement
 
                     float tempDiff = tempB - tempA;
                     float energyDelta = tempDiff * edge.Conductance * deltaTime;
+                    float limit;
 
+                    // Limited to factual energy in the block
+                    if (energyDelta > 0)
+                    {
+                        limit = tempDiff * capB;
+                        energyDelta = Math.Min(energyDelta, limit);
+                    }
+                    else
+                    {
+                        limit = tempDiff * capA;
+                        energyDelta = Math.Max(energyDelta, limit);
+                    }
+                    
                     HeatSession.Api.Utils.ApplyHeatChange(edge.A.Block, energyDelta / capA);
                     HeatSession.Api.Utils.ApplyHeatChange(edge.B.Block, -energyDelta / capB);
                 }
