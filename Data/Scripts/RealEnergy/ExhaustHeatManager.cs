@@ -78,7 +78,7 @@ namespace TSUT.HeatManagement
             builder.AppendLine($"------");
             builder.AppendLine("");
             builder.AppendLine("Heat Sources:");
-            builder.AppendLine($"  Exhaust: {-HeatSession.Api.Utils.GetActiveExhaustHeatLoss(_exhaust, 1):+0.00;-0.00;0.00} °C/s");
+            builder.AppendLine($"  Exhaust: {HeatSession.Api.Utils.GetActiveExhaustHeatLoss(_exhaust, 1):+0.00;-0.00;0.00} °C/s");
             builder.AppendLine($"  Air Exchange: {-HeatSession.Api.Utils.GetAmbientHeatLoss(_exhaust, 1):+0.00;-0.00;0.00} °C/s");
             builder.Append(neighborStringBuilder);
         }
@@ -88,14 +88,14 @@ namespace TSUT.HeatManagement
             if (_exhaust == null)
                 return 0f;
 
-            float change = HeatSession.Api.Utils.GetAmbientHeatLoss(_exhaust, deltaTime);
+            float change = -HeatSession.Api.Utils.GetAmbientHeatLoss(_exhaust, deltaTime);
 
             // You may want to implement a custom method for exhausts here
             if (_exhaust.IsWorking)
             {
                 change = HeatSession.Api.Utils.GetActiveExhaustHeatLoss(_exhaust, deltaTime);
             }
-            return -change;
+            return change;
         }
 
         public override void Cleanup()
