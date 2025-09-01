@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Sandbox.Game.Entities.Cube;
 using VRage.Game;
 using VRage.Game.ModAPI;
 using VRage.Utils;
@@ -26,35 +27,7 @@ namespace TSUT.HeatManagement
 
     public class HeatPipeManagerFactory : IHeatBehaviorFactory
     {
-        public static readonly List<string> HeatPipeSubtypeMask = new List<string> {
-            // Large grid blocks
-            "AirDuct",
-            "AirDuct1",
-            "AirDuct2",
-            "AirDuctCorner",
-            "AirDuctLight",
-            "AirDuctRamp",
-            "AirDuctT",
-            "AirDuctX",
-
-            "LargeBlockPipesStraight1",
-            "LargeBlockPipesStraight2",
-            "LargeBlockPipesEnd",
-            "LargeBlockPipesJunction",
-            "LargeBlockPipesCornerOuter",
-            "LargeBlockPipesCorner",
-            "LargeBlockPipesCornerInner",
-            // Small grid blocks
-            "SmallBlockConveyor",
-            "ConveyorTubeSmall",
-            "ConveyorTubeSmallCurved",
-            "ConveyorTubeSmallT",
-            "ConveyorTubeDuctSmall",
-            "ConveyorTubeDuctSmallCurved",
-            "ConveyorTubeDuctSmallT"
-        };
-
-        public static readonly Dictionary<string, VRageMath.Base6Directions.Direction[]> PipeConnectionMap = new Dictionary<string, Base6Directions.Direction[]>()
+        public static readonly Dictionary<string, Base6Directions.Direction[]> PipeConnectionMap = new Dictionary<string, Base6Directions.Direction[]>()
         {
             { "AirDuct", new[] { Base6Directions.Direction.Forward, Base6Directions.Direction.Backward } },
             { "AirDuct1", new[] { Base6Directions.Direction.Forward, Base6Directions.Direction.Backward } },
@@ -73,104 +46,20 @@ namespace TSUT.HeatManagement
             { "LargeBlockPipesCornerInner", new[] { Base6Directions.Direction.Up, Base6Directions.Direction.Right } },
             { "LargeBlockPipesCorner", new[] { Base6Directions.Direction.Forward, Base6Directions.Direction.Right } },
 
-            { "SmallBlockConveyor", new[] { Base6Directions.Direction.Forward, Base6Directions.Direction.Backward, Base6Directions.Direction.Left, Base6Directions.Direction.Right, Base6Directions.Direction.Up, Base6Directions.Direction.Down } },
-            { "ConveyorTubeSmall", new[] { Base6Directions.Direction.Forward, Base6Directions.Direction.Backward } },
-            { "ConveyorTubeSmallCurved", new[] { Base6Directions.Direction.Backward, Base6Directions.Direction.Down } },
-            { "ConveyorTubeSmallT", new[] { Base6Directions.Direction.Forward, Base6Directions.Direction.Backward, Base6Directions.Direction.Down } },
-            { "ConveyorTubeDuctSmall", new[] { Base6Directions.Direction.Forward, Base6Directions.Direction.Backward } },
-            { "ConveyorTubeDuctSmallCurved", new[] { Base6Directions.Direction.Backward, Base6Directions.Direction.Down } },
-            { "ConveyorTubeDuctSmallT", new[] { Base6Directions.Direction.Forward, Base6Directions.Direction.Backward, Base6Directions.Direction.Down } },
+            // Small grid blocks
+            { "SmallNeonTubesStraight1", new[] { Base6Directions.Direction.Right, Base6Directions.Direction.Left } },
+            { "SmallNeonTubesStraight2", new[] { Base6Directions.Direction.Right, Base6Directions.Direction.Left } },
+            { "SmallNeonTubesCorner", new[] { Base6Directions.Direction.Right, Base6Directions.Direction.Forward } },
+            { "SmallNeonTubesBendUp", new[] { Base6Directions.Direction.Right, Base6Directions.Direction.Up } },
+            { "SmallNeonTubesBendDown", new[] { Base6Directions.Direction.Left, Base6Directions.Direction.Down } },
+            { "SmallNeonTubesStraightDown", new[] { Base6Directions.Direction.Right, Base6Directions.Direction.Down } },
+            { "SmallNeonTubesStraightEnd1", new[] { Base6Directions.Direction.Right, Base6Directions.Direction.Left } },
+            { "SmallNeonTubesU", new[] { Base6Directions.Direction.Right } },
+            { "SmallNeonTubesT", new[] { Base6Directions.Direction.Right, Base6Directions.Direction.Left, Base6Directions.Direction.Backward } },
+            { "SmallNeonTubesCircle", new[] { Base6Directions.Direction.Right, Base6Directions.Direction.Left, Base6Directions.Direction.Backward, Base6Directions.Direction.Forward } },
         };
 
-        public void CollectHeatBehaviorsOld(IMyCubeGrid grid, IGridHeatManager gridManager, IDictionary<IMyCubeBlock, IHeatBehavior> behaviorMap)
-        {
-            List<HeatPipeManager> gridPipeManagers = new List<HeatPipeManager>();
-            if (grid.CustomName.Contains(Config.HeatDebugString))
-            {
-                MyLog.Default.WriteLine($"[HeatManagement] Start collecting on {grid.DisplayName}...");
-            }
-            // 1. Get all FatBlocks
-            List<IMySlimBlock> slimBlocks = new List<IMySlimBlock>();
-            grid.GetBlocks(slimBlocks);
-
-            // 2. Filter to pipe blocks
-            var pipeBlocks = slimBlocks
-                .Where(s => s.FatBlock != null && HeatPipeSubtypeMask.Contains(s.FatBlock.BlockDefinition.SubtypeName))
-                .Select(s => s.FatBlock)
-                .ToList();
-
-            // 3. Create HeatPipeNode for each pipe
-            var blockToNode = new Dictionary<IMyCubeBlock, HeatPipeNode>();
-            foreach (var block in pipeBlocks)
-            {
-                blockToNode[block] = new HeatPipeNode { Block = block };
-            }
-
-            // 4. Attempt to connect each node to its direct neighbors
-            foreach (var node in blockToNode.Values)
-            {
-                var pos = node.Block.Position;
-
-                foreach (var offset in Base6Directions.IntDirections)
-                {
-                    var neighborPos = pos + offset;
-                    var neighborBlock = pipeBlocks.FirstOrDefault(b => b.Position == neighborPos);
-                    if (neighborBlock == null)
-                        continue;
-
-                    var neighborNode = blockToNode[neighborBlock];
-
-                    if (!ArePipesConnectedByGeometry(node.Block, neighborBlock))
-                        continue;
-
-                    // 5. Try adding this connection to an existing manager
-                    bool connected = false;
-                    foreach (var manager in gridPipeManagers)
-                    {
-                        if (manager.TryConnectNodes(node, neighborNode))
-                        {
-                            connected = true;
-                            break;
-                        }
-                    }
-
-
-                    // 6. If no one accepted, make new manager
-                    if (!connected)
-                    {
-                        var manager = HeatPipeManager.CreateFromSingleNode(node, gridManager);
-                        manager.TryConnectNodes(node, neighborNode);
-                        gridPipeManagers.Add(manager);
-                    }
-                }
-            }
-
-            // 7. Ensure all nodes are part of a manager (even orphans)
-            foreach (var node in blockToNode.Values)
-            {
-                bool assigned = gridPipeManagers.Any(m => m.ContainsNode(node));
-                if (!assigned)
-                {
-                    var soloManager = HeatPipeManager.CreateFromSingleNode(node, gridManager);
-                    soloManager.TryAddNode(node);
-                    gridPipeManagers.Add(soloManager);
-                }
-            }
-
-            // Register behaviors
-            foreach (var manager in gridPipeManagers)
-            {
-                foreach (var node in manager.Nodes)
-                {
-                    behaviorMap[node.Block] = manager;
-                }
-            }
-
-            if (grid.CustomName.Contains(Config.HeatDebugString))
-            {
-                MyLog.Default.WriteLine($"[HeatManagement] Grid {grid.DisplayName} processed. Active managers: {gridPipeManagers.Count}");
-            }
-        }
+        private static readonly Dictionary<MyDefinitionId, bool> _pipeCandidateCache = new Dictionary<MyDefinitionId, bool>();
 
         public void CollectHeatBehaviors(IMyCubeGrid grid, IGridHeatManager gridManager, IDictionary<IMyCubeBlock, IHeatBehavior> behaviorMap)
         {
@@ -183,7 +72,7 @@ namespace TSUT.HeatManagement
             grid.GetBlocks(slimBlocks);
 
             var pipeBlocks = slimBlocks
-                .Where(s => s.FatBlock != null && HeatPipeSubtypeMask.Contains(s.FatBlock.BlockDefinition.SubtypeName))
+                .Where(s => s.FatBlock != null && IsPipeCandidate(s.FatBlock))
                 .Select(s => s.FatBlock)
                 .ToList();
 
@@ -226,9 +115,9 @@ namespace TSUT.HeatManagement
 
         public static bool IsPipeConnectedToBlock(IMyCubeBlock pipe, IMyCubeBlock targetBlock)
         {
-            Base6Directions.Direction[] pipeDirs;
+            var pipeDirs = GetPipeDirections(pipe);
             // Only pipe needs to be in the connection map
-            if (!PipeConnectionMap.TryGetValue(pipe.BlockDefinition.SubtypeName, out pipeDirs))
+            if (pipeDirs.Length < 1)
                 return false;
 
             var pipePos = pipe.Position;
@@ -268,10 +157,10 @@ namespace TSUT.HeatManagement
 
         public static bool ArePipesConnectedByGeometry(IMyCubeBlock a, IMyCubeBlock b)
         {
-            Base6Directions.Direction[] dirsA;
-            Base6Directions.Direction[] dirsB;
-            if (!PipeConnectionMap.TryGetValue(a.BlockDefinition.SubtypeName, out dirsA) ||
-                !PipeConnectionMap.TryGetValue(b.BlockDefinition.SubtypeName, out dirsB))
+            var dirsA = GetPipeDirections(a);
+            var dirsB = GetPipeDirections(b);
+
+            if (dirsA == null || dirsA.Length == 0 || dirsB == null || dirsB.Length == 0)
                 return false;
 
             var orientationA = a.Orientation;
@@ -305,6 +194,144 @@ namespace TSUT.HeatManagement
             return false;
         }
 
+        private static Base6Directions.Direction FindClosestDirection(Vector3 localPos)
+        {
+            // Normalize by largest axis
+            Vector3 abs = Vector3.Abs(localPos);
+
+            if (abs.X > abs.Y && abs.X > abs.Z)
+                return localPos.X > 0 ? Base6Directions.Direction.Right : Base6Directions.Direction.Left;
+
+            if (abs.Y > abs.X && abs.Y > abs.Z)
+                return localPos.Y > 0 ? Base6Directions.Direction.Up : Base6Directions.Direction.Down;
+
+            return localPos.Z < 0 ? Base6Directions.Direction.Forward : Base6Directions.Direction.Backward;
+        }
+
+        private static Base6Directions.Direction[] GetPipeDirections(IMyCubeBlock block)
+        {
+
+            Base6Directions.Direction[] dirs;
+            // 1. Try dictionary (heat-only pipes, etc.)
+            if (PipeConnectionMap.TryGetValue(block.BlockDefinition.SubtypeName, out dirs))
+                return dirs;
+
+            // 2. Try conveyor dummies
+            var dummies = new Dictionary<string, IMyModelDummy>();
+            block.Model.GetDummies(dummies);
+
+            var result = new List<Base6Directions.Direction>();
+
+            foreach (var kv in dummies)
+            {
+                var name = kv.Key.ToLower();
+                if (!name.Contains("conveyor"))
+                {
+                    continue;
+                }
+
+                var localPos = kv.Value.Matrix.Translation;
+
+                var gridDir = FindClosestDirection(localPos);
+
+                result.Add(gridDir);
+            }
+
+            return result.ToArray();
+        }
+
+        internal static bool IsPipeCandidate(IMyCubeBlock block)
+        {
+            var defId = block.BlockDefinition;
+
+            bool cached;
+
+            if (_pipeCandidateCache.TryGetValue(defId, out cached))
+                return cached;
+
+            bool result = false;
+
+            // 1. Check hardcoded subtype mask
+            if (PipeConnectionMap.ContainsKey(block.BlockDefinition.SubtypeName))
+            {
+                result = true;
+            }
+            else if (!block.BlockDefinition.SubtypeName.ToLowerInvariant().Contains("conveyor"))
+            {
+                result = false;
+            }
+            else
+            {
+                // 2. Check for conveyor dummies
+                var dummies = new Dictionary<string, IMyModelDummy>();
+                block.Model.GetDummies(dummies);
+
+                foreach (var kv in dummies)
+                {
+                    var name = kv.Key.ToLower();
+                    if (name.Contains("conveyor"))
+                    {
+                        result = true;
+                        break;
+                    }
+                }
+            }
+
+            _pipeCandidateCache[defId] = result; // cache it
+            return result;
+        }
+
+        public List<IMyCubeBlock> GetConnectedBlocks(IMyCubeBlock root)
+        {
+            if (root.CubeGrid.CustomName.Contains(Config.HeatDebugString))
+            {
+                MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] Find connected from: {root.Position}");
+            }
+            var result = new List<IMyCubeBlock>();
+
+            var grid = root.CubeGrid;
+            var pos = root.Position;
+            var dirs = GetPipeDirections(root);
+            var orientation = root.Orientation;
+
+            if (root.CubeGrid.CustomName.Contains(Config.HeatDebugString))
+            {
+                MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] Directions to look: {dirs.Length}");
+            }
+
+            foreach (var dir in dirs)
+            {
+                // Rotate local direction into grid space
+                var gridDir = orientation.TransformDirection(dir);
+                var neighborPos = pos + Base6Directions.GetIntVector(gridDir);
+
+                var slim = grid.GetCubeBlock(neighborPos);
+                if (root.CubeGrid.CustomName.Contains(Config.HeatDebugString))
+                {
+                    MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] Checking direction: {dir}, grid: {gridDir}, pos: {neighborPos}, found: {slim?.FatBlock != null}");
+                }
+                if (slim?.FatBlock == null)
+                    continue;
+
+                var neighbor = slim.FatBlock;
+
+                // Confirm that both have ports facing each other
+                if (ArePipesConnectedByGeometry(root, neighbor))
+                {
+                    result.Add(neighbor);
+                }
+                else
+                {
+                    if (root.CubeGrid.CustomName.Contains(Config.HeatDebugString))
+                    {
+                        MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] Result: {root.DisplayNameText} -!> {neighbor.DisplayNameText}");
+                    }
+                }
+
+            }
+
+            return result;
+        }
 
         public HeatBehaviorAttachResult OnBlockAdded(IMyCubeBlock block, IGridHeatManager gridManager)
         {
@@ -320,7 +347,7 @@ namespace TSUT.HeatManagement
                 MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] Managers on the grid: {gridPipeManagers.Count}");
             }
 
-            if (!HeatPipeSubtypeMask.Contains(block.BlockDefinition.SubtypeName))
+            if (!IsPipeCandidate(block))
                 return result;
 
             if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
@@ -341,19 +368,19 @@ namespace TSUT.HeatManagement
                 MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] Looking for neighbors");
             }
 
-            // 1. Look for existing pipe connections
-            foreach (var offset in neighborOffsets)
+            var connectedNeighbors = GetConnectedBlocks(block);
+
+            if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
             {
-                var neighborPos = pos + offset;
-                var slim = grid.GetCubeBlock(neighborPos);
-                if (slim?.FatBlock == null)
-                    continue;
+                MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] Found {connectedNeighbors.Count}");
+            }
 
-                var neighbor = slim.FatBlock;
-
+            // 1. Check connected neighbors for existing networks
+            foreach (var cneighbor in connectedNeighbors)
+            {
                 if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
                 {
-                    MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] >> Found neighbor: {neighbor.DisplayNameText}");
+                    MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] >> Found neighbor: {cneighbor.DisplayNameText}");
                 }
 
                 foreach (var manager in gridPipeManagers)
@@ -362,7 +389,7 @@ namespace TSUT.HeatManagement
                     {
                         MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] >> Nodes in manager: {manager.Nodes.Count}");
                     }
-                    HeatPipeNode node = manager.TryGetNode(neighbor);
+                    HeatPipeNode node = manager.TryGetNode(cneighbor);
                     if (node == null)
                         continue;
 
@@ -371,7 +398,7 @@ namespace TSUT.HeatManagement
                         MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] >> Found node");
                     }
 
-                    if (HeatPipeManagerFactory.ArePipesConnectedByGeometry(block, neighbor))
+                    if (ArePipesConnectedByGeometry(block, cneighbor))
                     {
                         if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
                         {
@@ -382,6 +409,49 @@ namespace TSUT.HeatManagement
                     }
                 }
             }
+
+
+            // // 1. Look for existing pipe connections
+            // foreach (var offset in neighborOffsets)
+            // {
+            //     var neighborPos = pos + offset;
+            //     var slim = grid.GetCubeBlock(neighborPos);
+            //     if (slim?.FatBlock == null)
+            //         continue;
+
+            //     var neighbor = slim.FatBlock;
+
+            //     if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
+            //     {
+            //         MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] >> Found neighbor: {neighbor.DisplayNameText}");
+            //     }
+
+            //     foreach (var manager in gridPipeManagers)
+            //     {
+            //         if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
+            //         {
+            //             MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] >> Nodes in manager: {manager.Nodes.Count}");
+            //         }
+            //         HeatPipeNode node = manager.TryGetNode(neighbor);
+            //         if (node == null)
+            //             continue;
+
+            //         if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
+            //         {
+            //             MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] >> Found node");
+            //         }
+
+            //         if (ArePipesConnectedByGeometry(block, neighbor))
+            //         {
+            //             if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
+            //             {
+            //                 MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] >> Connectable, add node");
+            //             }
+            //             connectedManagers.Add(manager);
+            //             neighborNodes[node] = manager;
+            //         }
+            //     }
+            // }
 
             if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
             {
@@ -495,7 +565,7 @@ namespace TSUT.HeatManagement
         public bool TryAddBlock(IMyCubeBlock block)
         {
             // Must be pipe type
-            if (!HeatPipeManagerFactory.HeatPipeSubtypeMask.Contains(block.BlockDefinition.SubtypeName)) // or match your mask
+            if (!HeatPipeManagerFactory.IsPipeCandidate(block))
                 return false;
 
             // Is it connected to any of our known nodes?
@@ -648,7 +718,7 @@ namespace TSUT.HeatManagement
             // Use global pipe-to-block conductance config
             float conductance = Config.Instance.HEATPIPE_CONDUCTIVITY;
             float energyTransferred = tempDiff * contactArea * conductance * deltaTime;
-            
+
             // Return raw joules of heat
             return energyTransferred;
         }
@@ -677,15 +747,15 @@ namespace TSUT.HeatManagement
                     // Limited to factual energy in the block
                     if (energyDelta > 0)
                     {
-                        limit = tempDiff * capB;
+                        limit = tempDiff * capB / 2;
                         energyDelta = Math.Min(energyDelta, limit);
                     }
                     else
                     {
-                        limit = tempDiff * capA;
+                        limit = tempDiff * capA / 2;
                         energyDelta = Math.Max(energyDelta, limit);
                     }
-                    
+
                     HeatSession.Api.Utils.ApplyHeatChange(edge.A.Block, energyDelta / capA);
                     HeatSession.Api.Utils.ApplyHeatChange(edge.B.Block, -energyDelta / capB);
                 }
