@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using Sandbox.Game.Entities.Cube;
 using VRage.Game;
 using VRage.Game.ModAPI;
 using VRage.Utils;
@@ -725,7 +724,6 @@ namespace TSUT.HeatManagement
 
         public void SpreadHeat(float deltaTime)
         {
-            MyLog.Default.WriteLine($"Strt precessing net #{GetHashCode()}...");
             foreach (var node in _nodes)
             {
                 foreach (var edge in node.Connections)

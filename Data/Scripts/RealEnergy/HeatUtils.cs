@@ -8,7 +8,6 @@ using Sandbox.ModAPI;
 using SpaceEngineers.Game.ModAPI;
 using VRage.Game;
 using VRage.Game.ModAPI;
-using VRage.Utils;
 using VRageMath;
 
 namespace TSUT.HeatManagement
@@ -52,8 +51,6 @@ namespace TSUT.HeatManagement
             { "Dust", -2f },
             { "ElectricStorm", -10f }
         };
-
-        private int tpm = 0;
 
         public void PurgeCaches()
         {
@@ -411,6 +408,14 @@ namespace TSUT.HeatManagement
             float heatRemoved = coolingPower * deltaTime * tempDiff / GetThermalCapacity(vent); // Joules removed
 
             return heatRemoved;
+        }
+
+        public float GetHeatToDissipate(IMyCubeBlock block, float deltaTime)
+        {
+            float currentTemp = GetHeat(block);
+            float ambientTemp = CalculateAmbientTemperature(block);
+            float tempDiff = currentTemp - ambientTemp;
+            return deltaTime * tempDiff / 2 * GetThermalCapacity(block);
         }
 
         public float GetActiveHeatVentLoss(IMyHeatVent vent, float deltaTime)

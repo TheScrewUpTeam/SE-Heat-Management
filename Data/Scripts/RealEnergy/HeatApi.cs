@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using Sandbox.Game.Entities;
 using Sandbox.ModAPI;
 using SpaceEngineers.Game.ModAPI;
-using SpaceEngineers.Game.VoiceChat;
 using VRage.Game.ModAPI;
 using VRageMath;
 
@@ -82,6 +81,7 @@ namespace TSUT.HeatManagement
         float GetActiveExhaustHeatLoss(IMyExhaustBlock exhaust, float deltaTime);
         float GetExchangeWithNetwork(IMyCubeBlock block, IMyCubeBlock networkBlock, float deltaTime);
         float GetExchangeUniversal(IMyCubeBlock block, IMyCubeBlock neighborBlock, float deltaTime);
+        float GetHeatToDissipate(IMyCubeBlock block, float deltaTime);
     }
 
     public interface IHeatEffects
@@ -91,6 +91,7 @@ namespace TSUT.HeatManagement
         void RemoveSmoke(IMyCubeBlock battery);
         void UpdateBlockHeatLight(IMyCubeBlock block, float heat);
         void UpdateLightsPosition();
+        void InstantiateSteam(IMyCubeBlock battery);
     }
 
     public interface IHeatApi

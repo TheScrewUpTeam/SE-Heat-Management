@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Sandbox.Game;
 using Sandbox.Game.Lights;
 using VRage.Game;
 using VRage.Game.ModAPI;
@@ -102,16 +101,36 @@ namespace TSUT.HeatManagement
                 _lights.Remove(b);
         }
 
+        public void InstantiateSteam(IMyCubeBlock block)
+        {
+            if (blocksAtSmoke.ContainsKey(block))
+            {
+                return;
+            }
+            MyParticleEffect effect;
+            var position = block.GetPosition();
+            Vector3D forward = block.WorldMatrix.Forward;
+            position += forward * (block.CubeGrid.GridSize * 0.5);
+            MatrixD matrix = block.WorldMatrix;
+            uint parentId = (uint)(block.EntityId & 0xFFFFFFFF);
+            if (MyParticlesManager.TryCreateParticleEffect("OxyVent", ref matrix, ref position, parentId, out effect))
+            {
+                effect.UserScale = block.CubeGrid.GridSize;
+                effect.UserColorMultiplier = Color.White;
+                effect.UserColorIntensityMultiplier = 5;
+                blocksAtSmoke[block] = effect;
+            }
+        }
 
-        public void InstantiateSmoke(IMyCubeBlock battery)
+        public void InstantiateSmoke(IMyCubeBlock block)
         {
             MyParticleEffect effect;
-            var position = battery.GetPosition();
-            MatrixD matrix = battery.WorldMatrix;
-            uint parentId = (uint)(battery.EntityId & 0xFFFFFFFF);
+            var position = block.GetPosition();
+            MatrixD matrix = block.WorldMatrix;
+            uint parentId = (uint)(block.EntityId & 0xFFFFFFFF);
             if (MyParticlesManager.TryCreateParticleEffect("Smoke_Construction", ref matrix, ref position, parentId, out effect))
             {
-                blocksAtSmoke[battery] = effect;
+                blocksAtSmoke[block] = effect;
             }
         }
 
@@ -123,6 +142,7 @@ namespace TSUT.HeatManagement
             if (blocksAtSmoke.TryGetValue(battery, out effect))
             {
                 effect.Stop();
+                effect.Clear();
                 blocksAtSmoke.Remove(battery);
             }
         }

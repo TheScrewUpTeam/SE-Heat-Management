@@ -1,21 +1,22 @@
 using Sandbox.ModAPI;
 using System;
-using System.Linq.Expressions;
 using VRage.Utils;
 
 namespace TSUT.HeatManagement
 {
     public class Config : IConfig
     {
-        public static string Version = "1.2.2";
+        public static string Version = "1.2.3";
         public static ushort HeatSyncMessageId = 7949; // Choose any unused ushort value
 
         public static ushort BlockHeatEventUniqueId = 17949; // Unique ID for block heat events
         public static ushort GridHeatEventUniqueId = 27949; // Unique ID for block heat events
 
+        public static readonly Guid O2TurboKey = new Guid("decafbad-0000-4c00-babe-c0ffee000002");
+
         public static string HeatDebugString = "HeatDebug";
 
-        public string HEAT_SYSTEM_VERSION = "1.2.2";
+        public string HEAT_SYSTEM_VERSION = "1.2.3";
         public bool HEAT_SYSTEM_AUTO_UPDATE = true;
         public float HEAT_COOLDOWN_COEFF { get; set; } = 20f;
         public float HEAT_RADIATION_COEFF { get; set; } = 5f;
@@ -23,6 +24,7 @@ namespace TSUT.HeatManagement
         public bool DISCHARGE_HEAT_CONFIGURABLE { get; set; } = false;
         public float THERMAL_CONDUCTIVITY { get; set; } = 500f;
         public float VENT_COOLING_RATE { get; set; } = 5000f;
+        public float VENT_TURBO_COOLING_RATE { get; set; } = 500f;
         public float THRUSTER_COOLING_RATE { get; set; } = 35000f;
         public float CRITICAL_TEMP { get; set; } = 150f;
         public float SMOKE_TRESHOLD => CRITICAL_TEMP * 0.9f;
