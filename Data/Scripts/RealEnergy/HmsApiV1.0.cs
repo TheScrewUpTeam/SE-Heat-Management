@@ -21,6 +21,7 @@ namespace TSUT.HeatManagement
         private Action _onReady;
         public IHeatUtils Utils;
         public IHeatEffects Effects;
+        private bool _isApiReceived = false;
 
         public HmsApi(Action onReady)
         {
@@ -35,9 +36,12 @@ namespace TSUT.HeatManagement
 
         private void OnApiReceived(object obj)
         {
+            if (_isApiReceived)
+                return;
             Utils = new HmsUtils(obj);
             Effects = new HmsEffects(obj);
             _onReady?.Invoke();
+            _isApiReceived = true;
         }
 
         public void RegisterHeatBehaviorFactory(

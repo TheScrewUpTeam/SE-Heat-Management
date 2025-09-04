@@ -69,7 +69,7 @@ namespace TSUT.HeatManagement
             }
 
             float thermalCapacity = HeatSession.Api.Utils.GetThermalCapacity(battery);
-            float outputMW = battery.CurrentOutput + battery.CurrentInput; // Total power output in MW
+            float outputMW = Math.Abs(battery.CurrentOutput - battery.CurrentInput); // Total power output in MW
 
             float tNorm = MathHelper.Clamp(HeatSession.Api.Utils.GetHeat(battery) / Config.Instance.CRITICAL_TEMP, 0f, 1f);
             float resistanceMultiplier = MathHelper.Lerp(1f, 1.2f, tNorm * tNorm); // More exponential rise

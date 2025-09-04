@@ -10,7 +10,6 @@ using System.Linq;
 using System;
 using SpaceEngineers.Game.ModAPI;
 using Sandbox.Game.Entities;
-using System.Runtime.Remoting.Messaging;
 
 
 namespace TSUT.HeatManagement
@@ -19,7 +18,6 @@ namespace TSUT.HeatManagement
     [MySessionComponentDescriptor(MyUpdateOrder.BeforeSimulation)]
     public class HeatSession : MySessionComponentBase
     {
-        const int NEIGHBOT_UPDATE_INTERVAL = 60; // in ticks
         const int MAIN_UPDATE_INTERVAL = 30; // in ticks
 
         private static HeatApi _heatApi = new HeatApi();
@@ -35,7 +33,6 @@ namespace TSUT.HeatManagement
 
         private static bool _initialized = false;
         private int _tickCount = 0;
-        private int _lastNeighborsUpdateTick = 0;
         private int _lastMainUpdateTick = 0;
 
         private static Dictionary<long, IHeatBehavior> _trackedNetworkBlocks = new Dictionary<long, IHeatBehavior>();
@@ -106,6 +103,9 @@ namespace TSUT.HeatManagement
 
         public override void BeforeStart()
         {
+            var shareable = ConvertApiToShareable(_heatApi);
+            MyAPIGateway.Utilities.SendModMessage(HmsApi.HeatApiMessageId, shareable);
+            MyLog.Default.WriteLine($"[HeatManagement] HeatAPI populated late");
             networking.Register();
             RegisterDebugControl();
 
@@ -231,18 +231,6 @@ namespace TSUT.HeatManagement
                 }
                 _lastMainUpdateTick = _tickCount;
             }
-
-            // if (_tickCount % NEIGHBOT_UPDATE_INTERVAL == 0)
-            // {
-            //     float passedTicks = _tickCount - _lastNeighborsUpdateTick;
-            //     float passedTime = passedTicks * MyEngineConstants.UPDATE_STEP_SIZE_IN_SECONDS;
-
-            //     foreach (var manager in _gridHeatManagers.Values)
-            //     {
-            //         manager.UpdateNeighborsTemp(passedTime);
-            //     }
-            //     _lastNeighborsUpdateTick = _tickCount;
-            // }
         }
 
         private void ClientSideUpdates()
@@ -254,7 +242,7 @@ namespace TSUT.HeatManagement
                 manager.UpdateVisuals(MyEngineConstants.UPDATE_STEP_SIZE_IN_SECONDS);
             }
 
-            if (_tickCount % NEIGHBOT_UPDATE_INTERVAL == 0)
+            if (_tickCount % MAIN_UPDATE_INTERVAL == 0)
             {
                 // Notify all event controller events
                 foreach (var eventControllerEvent in _heatApi.Registry.GetEventControllerEvents())

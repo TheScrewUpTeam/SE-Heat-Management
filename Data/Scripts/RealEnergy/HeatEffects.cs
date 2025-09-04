@@ -103,9 +103,11 @@ namespace TSUT.HeatManagement
 
         public void InstantiateSteam(IMyCubeBlock block)
         {
-            if (blocksAtSmoke.ContainsKey(block))
+            MyParticleEffect oldEffect;
+            if (blocksAtSmoke.TryGetValue(block, out oldEffect) && !oldEffect.IsStopped)
             {
-                return;
+                oldEffect.Stop(false);
+                oldEffect.Clear();
             }
             MyParticleEffect effect;
             var position = block.GetPosition();
@@ -113,9 +115,9 @@ namespace TSUT.HeatManagement
             position += forward * (block.CubeGrid.GridSize * 0.5);
             MatrixD matrix = block.WorldMatrix;
             uint parentId = (uint)(block.EntityId & 0xFFFFFFFF);
-            if (MyParticlesManager.TryCreateParticleEffect("OxyVent", ref matrix, ref position, parentId, out effect))
+            if (MyParticlesManager.TryCreateParticleEffect("OxyLeakLarge", ref matrix, ref position, parentId, out effect))
             {
-                effect.UserScale = block.CubeGrid.GridSize;
+                effect.UserScale = block.CubeGrid.GridSize / 5;
                 effect.UserColorMultiplier = Color.White;
                 effect.UserColorIntensityMultiplier = 5;
                 blocksAtSmoke[block] = effect;
