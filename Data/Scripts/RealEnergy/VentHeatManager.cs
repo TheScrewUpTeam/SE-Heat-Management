@@ -139,7 +139,7 @@ namespace TSUT.HeatManagement
                 o2Exchange = o2Needed * Config.Instance.VENT_TURBO_COOLING_RATE / ownThermalCapacity;
             }
 
-            float heatChange = GetAmbientExchange(1f) - cumulativeNeighborHeatChange - cumulativeNetworkHeatChange - o2Exchange; // Assuming deltaTime of 1 second for display purposes
+            float heatChange = -GetAmbientExchange(1f) - cumulativeNeighborHeatChange - cumulativeNetworkHeatChange - o2Exchange; // Assuming deltaTime of 1 second for display purposes
 
             builder.AppendLine($"--- Heat Management ---");
             builder.AppendLine($"Temperature: {HeatSession.Api.Utils.GetHeat(block):F2} °C");
@@ -158,7 +158,7 @@ namespace TSUT.HeatManagement
             builder.AppendLine($"------");
             builder.AppendLine("");
             builder.AppendLine("Heat Sources:");
-            builder.AppendLine($"  Air Exchange: {GetAmbientExchange(1):+0.00;-0.00;0.00} °C/s");
+            builder.AppendLine($"  Air Exchange: {-GetAmbientExchange(1):+0.00;-0.00;0.00} °C/s");
             builder.AppendLine($"  Turbo Cooling: {-o2Exchange:+0.00;-0.00;0.00} °C/s");
             builder.Append(neighborStringBuilder);
         }
@@ -174,7 +174,7 @@ namespace TSUT.HeatManagement
                 change += HeatSession.Api.Utils.GetActiveVentHealLoss(_vent, deltaTime);
             }
 
-            return -change;
+            return change;
         }
 
         public override float GetHeatChange(float deltaTime)
