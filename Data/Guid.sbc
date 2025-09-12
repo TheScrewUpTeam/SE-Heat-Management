@@ -7,6 +7,7 @@
       </Id>
       <RegisteredStorageGuids>
         <guid>decafbad-0000-4c00-babe-c0ffee000001</guid>
+        <guid>decafbad-0000-4c00-babe-c0ffee000002</guid>
       </RegisteredStorageGuids>
     </EntityComponent>
   </EntityComponents>

@@ -57,11 +57,6 @@ namespace TSUT.HeatManagement
 
         private static void SetO2Turbo(IMyCubeBlock block, float o2turbo)
         {
-            if (block.Storage == null)
-            {
-                block.Storage = new MyModStorageComponent();
-            }
-
             block.Storage[Config.O2TurboKey] = o2turbo.ToString();
         }
 
@@ -71,17 +66,15 @@ namespace TSUT.HeatManagement
             {
                 return 0f;
             }
-            if (block.Storage == null)
-            {
-                block.Storage = new MyModStorageComponent();
-            }
 
             string turboStr;
             if (block.Storage.TryGetValue(Config.O2TurboKey, out turboStr))
             {
                 float heat;
                 if (float.TryParse(turboStr, out heat) && !float.IsNaN(heat) && !float.IsInfinity(heat))
+                {
                     return heat;
+                }
             }
 
             return 0f;
