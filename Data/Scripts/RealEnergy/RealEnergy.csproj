@@ -71,6 +71,7 @@
     <Compile Include="Builders\ObjectBuilderHeat.cs" />
     <Compile Include="Builders\ObjectBuilderGridHeat.cs" />
     <Compile Include="HmsApiV1.0.cs" />
+    <Compile Include="Commands.cs" />
     <Compile Include="Session.cs" />
   </ItemGroup>
   <ItemGroup>

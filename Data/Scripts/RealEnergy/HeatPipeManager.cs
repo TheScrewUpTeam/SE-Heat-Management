@@ -207,7 +207,7 @@ namespace TSUT.HeatManagement
             return localPos.Z < 0 ? Base6Directions.Direction.Forward : Base6Directions.Direction.Backward;
         }
 
-        private static Base6Directions.Direction[] GetPipeDirections(IMyCubeBlock block)
+        private static Base6Directions.Direction[] GetPipeDirections(IMyCubeBlock block, bool debug = false)
         {
 
             Base6Directions.Direction[] dirs;
@@ -221,8 +221,17 @@ namespace TSUT.HeatManagement
 
             var result = new List<Base6Directions.Direction>();
 
+            if (debug)
+            {
+                MyLog.Default.WriteLine($"[HeatManagement] Checking dummies for {block.DisplayNameText}: {dummies.Count}");
+            }
+
             foreach (var kv in dummies)
             {
+                if (debug)
+                {
+                    MyLog.Default.WriteLine($"[HeatManagement] Dummy: {kv.Key}");
+                }
                 var name = kv.Key.ToLower();
                 if (!name.Contains("conveyor"))
                 {
@@ -284,18 +293,18 @@ namespace TSUT.HeatManagement
         {
             if (root.CubeGrid.CustomName.Contains(Config.HeatDebugString))
             {
-                MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] Find connected from: {root.Position}");
+                MyLog.Default.WriteLine($"[HeatManagement] Find connected from: {root.Position}");
             }
             var result = new List<IMyCubeBlock>();
 
             var grid = root.CubeGrid;
             var pos = root.Position;
-            var dirs = GetPipeDirections(root);
+            var dirs = GetPipeDirections(root, root.CubeGrid.CustomName.Contains(Config.HeatDebugString));
             var orientation = root.Orientation;
 
             if (root.CubeGrid.CustomName.Contains(Config.HeatDebugString))
             {
-                MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] Directions to look: {dirs.Length}");
+                MyLog.Default.WriteLine($"[HeatManagement] Directions to look: {dirs.Length}");
             }
 
             foreach (var dir in dirs)
@@ -307,7 +316,7 @@ namespace TSUT.HeatManagement
                 var slim = grid.GetCubeBlock(neighborPos);
                 if (root.CubeGrid.CustomName.Contains(Config.HeatDebugString))
                 {
-                    MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] Checking direction: {dir}, grid: {gridDir}, pos: {neighborPos}, found: {slim?.FatBlock != null}");
+                    MyLog.Default.WriteLine($"[HeatManagement] Checking direction: {dir}, grid: {gridDir}, pos: {neighborPos}, found: {slim?.FatBlock != null}");
                 }
                 if (slim?.FatBlock == null)
                     continue;
@@ -323,7 +332,7 @@ namespace TSUT.HeatManagement
                 {
                     if (root.CubeGrid.CustomName.Contains(Config.HeatDebugString))
                     {
-                        MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] Result: {root.DisplayNameText} -!> {neighbor.DisplayNameText}");
+                        MyLog.Default.WriteLine($"[HeatManagement] Result: {root.DisplayNameText} -!> {neighbor.DisplayNameText}");
                     }
                 }
 
@@ -336,14 +345,14 @@ namespace TSUT.HeatManagement
         {
             if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
             {
-                MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] !!! New block on a grid: {block.BlockDefinition.SubtypeName}");
+                MyLog.Default.WriteLine($"[HeatManagement] !!! New block on a grid: {block.BlockDefinition.SubtypeName}");
             }
             var result = new HeatBehaviorAttachResult();
             var gridPipeManagers = gridManager.GetHeatPipeManagers();
 
             if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
             {
-                MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] Managers on the grid: {gridPipeManagers.Count}");
+                MyLog.Default.WriteLine($"[HeatManagement] Managers on the grid: {gridPipeManagers.Count}");
             }
 
             if (!IsPipeCandidate(block))
@@ -351,27 +360,25 @@ namespace TSUT.HeatManagement
 
             if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
             {
-                MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] Type check: passed");
+                MyLog.Default.WriteLine($"[HeatManagement] Type check: passed");
             }
 
             var grid = block.CubeGrid;
             var pos = block.Position;
-
-            var neighborOffsets = new[] { Vector3I.Forward, Vector3I.Backward, Vector3I.Left, Vector3I.Right, Vector3I.Up, Vector3I.Down };
 
             var connectedManagers = new List<HeatPipeManager>();
             var neighborNodes = new Dictionary<HeatPipeNode, HeatPipeManager>();
 
             if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
             {
-                MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] Looking for neighbors");
+                MyLog.Default.WriteLine($"[HeatManagement] Looking for neighbors");
             }
 
             var connectedNeighbors = GetConnectedBlocks(block);
 
             if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
             {
-                MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] Found {connectedNeighbors.Count}");
+                MyLog.Default.WriteLine($"[HeatManagement] Found {connectedNeighbors.Count}");
             }
 
             // 1. Check connected neighbors for existing networks

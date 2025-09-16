@@ -12,12 +12,13 @@ namespace TSUT.HeatManagement
 
     public class GridHeatManager : IGridHeatManager
     {
-
+        private readonly IMyCubeGrid _grid;
         private readonly Dictionary<IMyCubeBlock, IHeatBehavior> _heatBehaviors = new Dictionary<IMyCubeBlock, IHeatBehavior>();
         private bool _showDebug = false;
 
         public GridHeatManager(IMyCubeGrid grid, bool lazy = false)
         {
+            _grid = grid;
             foreach (var factory in HeatSession.Api.Registry.GetFactories())
             {
                 if (factory == null)
@@ -66,6 +67,19 @@ namespace TSUT.HeatManagement
             {
                 grid.OnBlockAdded += OnBlockAdded;
                 grid.OnBlockRemoved += OnBlockRemoved;
+                grid.OnBlockIntegrityChanged += OnBlockIntegrityChanged;
+            }
+        }
+
+        private void OnBlockIntegrityChanged(IMySlimBlock block)
+        {
+            if (block.BuildLevelRatio >= 1f)
+            {
+                OnBlockAdded(block);
+            }
+            else
+            {
+                OnBlockRemoved(block);
             }
         }
 
@@ -97,6 +111,11 @@ namespace TSUT.HeatManagement
         {
             if (block == null || block.FatBlock == null || _heatBehaviors.ContainsKey(block.FatBlock))
                 return;
+
+            if (block.BuildLevelRatio < 1f)
+            {
+                return;
+            }
 
             foreach (var factory in HeatSession.Api.Registry.GetFactories())
             {
@@ -224,6 +243,9 @@ namespace TSUT.HeatManagement
                 }
             }
             _heatBehaviors.Clear();
+            _grid.OnBlockAdded -= OnBlockAdded;
+            _grid.OnBlockRemoved -= OnBlockRemoved;
+            _grid.OnBlockIntegrityChanged -= OnBlockIntegrityChanged;
         }
 
 

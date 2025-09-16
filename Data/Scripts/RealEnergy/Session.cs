@@ -41,10 +41,14 @@ namespace TSUT.HeatManagement
 
         private HashSet<IMyCubeGrid> _ownershipSubscribedGrids = new HashSet<IMyCubeGrid>();
 
+        private HeatCommands _commandsInstance;
+        public static HeatSession Instance { get; private set; }
+
         public override void LoadData()
         {
             // Load config (will use defaults if file doesn't exist)
             Config = Config.Instance;
+            Instance = this;
 
             _heatApi.Registry.RegisterHeatBehaviorFactory(new BatteryHeatManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new VentHeatManagerFactory());
@@ -57,6 +61,7 @@ namespace TSUT.HeatManagement
             var shareable = ConvertApiToShareable(_heatApi);
             MyAPIGateway.Utilities.SendModMessage(HmsApi.HeatApiMessageId, shareable);
             MyLog.Default.WriteLine($"[HeatManagement] HeatAPI populated");
+            _commandsInstance = HeatCommands.Instance; // Initialize commands
         }
 
         private void OnHeatProviderRegister(object obj)
@@ -97,6 +102,7 @@ namespace TSUT.HeatManagement
 
         protected override void UnloadData()
         {
+            _commandsInstance?.Unload();
             networking?.Unregister();
             MyAPIGateway.Utilities.UnregisterMessageHandler(HmsApi.HeatProviderMesageId, OnHeatProviderRegister);
         }
@@ -237,15 +243,18 @@ namespace TSUT.HeatManagement
         {
             _heatApi.Effects.UpdateLightsPosition();
 
-            foreach (var manager in _gridHeatManagers.Values)
+            var list = _gridHeatManagers.Values.ToList();
+
+            foreach (var manager in list)
             {
                 manager.UpdateVisuals(MyEngineConstants.UPDATE_STEP_SIZE_IN_SECONDS);
             }
 
             if (_tickCount % MAIN_UPDATE_INTERVAL == 0)
             {
+                var eventControllers = _heatApi.Registry.GetEventControllerEvents();
                 // Notify all event controller events
-                foreach (var eventControllerEvent in _heatApi.Registry.GetEventControllerEvents())
+                foreach (var eventControllerEvent in eventControllers)
                 {
                     if (eventControllerEvent != null && eventControllerEvent is BlockTemperatureChanged)
                     {
@@ -346,6 +355,23 @@ namespace TSUT.HeatManagement
 
             manager = new GridHeatManager(grid);
             _gridHeatManagers[grid] = manager;
+        }
+
+        public static void RebuildEverything()
+        {
+            foreach (var manager in _gridHeatManagers.Values)
+            {
+                manager.Cleanup();
+            }
+            _gridHeatManagers.Clear();
+            
+
+            HashSet<IMyEntity> allEntities = new HashSet<IMyEntity>();
+            MyAPIGateway.Entities.GetEntities(allEntities);
+            foreach (var entity in allEntities)
+            {
+                Instance.OnEntityAdd(entity);
+            }
         }
 
         private static void OnCustomControlGetter(IMyTerminalBlock block, List<IMyTerminalControl> controls)

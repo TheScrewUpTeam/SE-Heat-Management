@@ -122,6 +122,7 @@ namespace TSUT.HeatManagement
             {
                 b.Components.Get<BlockTemperatureChanged>()._temperatureThreshold = value;
                 b.Components.Get<BlockTemperatureChanged>().NotifyValuesChanged();
+                MyLog.Default.WriteLineAndConsole($"[HeatManagement] BlockTemperatureChanged: Threshold set to {value} °C");
                 NotifyServer(b.EntityId, value);
             };
             sliderBox.Title = MyStringId.GetOrCompute("Threshold");
@@ -142,16 +143,13 @@ namespace TSUT.HeatManagement
 
         public void NotifyValuesChanged()
         {
-
             if (EventController == null)
                 return;
 
             if (!IsSelected)
                 return;
 
-            if (!MyAPIGateway.Multiplayer.IsServer){
-                UpdateDetailedInfo(EventController.EntityId);
-            }
+            UpdateDetailedInfo(EventController.EntityId);
 
             float threshold = _temperatureThreshold;
             bool isBelow = EventController.IsLowerOrEqualCondition;
@@ -179,8 +177,10 @@ namespace TSUT.HeatManagement
                     result = result || conditionMet;
                 }
             }
-            EventController.TriggerAction(result ? 0 : 1);
-            _lastTriggeredAction = result ? 0 : 1;
+            if (_lastTriggeredAction != (result ? 0 : 1)) {
+                EventController.TriggerAction(result ? 0 : 1);
+                _lastTriggeredAction = result ? 0 : 1;
+            }
         }
 
         public void RemoveBlocks(IEnumerable<IMyTerminalBlock> blocks)
