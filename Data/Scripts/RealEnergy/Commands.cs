@@ -26,7 +26,7 @@ namespace TSUT.HeatManagement
 
         private void OnMessageEntered(string messageText, ref bool sendToOthers)
         {
-            if (messageText.Equals("/refreshNetworks", StringComparison.OrdinalIgnoreCase))
+            if (messageText.Equals("/HMS.refreshNetworks", StringComparison.OrdinalIgnoreCase))
             {
                 HeatSession.RebuildEverything();
                 MyAPIGateway.Utilities.ShowMessage("HeatManagement", "Heat networks refreshed.");
