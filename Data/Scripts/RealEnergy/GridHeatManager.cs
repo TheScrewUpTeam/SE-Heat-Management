@@ -73,7 +73,9 @@ namespace TSUT.HeatManagement
 
         private void OnBlockIntegrityChanged(IMySlimBlock block)
         {
-            if (block.BuildLevelRatio >= 1f)
+            if (block.FatBlock == null)
+                return;
+            if (block.FatBlock != null && block.FatBlock.IsFunctional)
             {
                 OnBlockAdded(block);
             }
@@ -112,7 +114,7 @@ namespace TSUT.HeatManagement
             if (block == null || block.FatBlock == null || _heatBehaviors.ContainsKey(block.FatBlock))
                 return;
 
-            if (block.BuildLevelRatio < 1f)
+            if (!block.FatBlock.IsFunctional)
             {
                 return;
             }

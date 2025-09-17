@@ -39,7 +39,7 @@ namespace TSUT.HeatManagement
 
         public static Config Config;
 
-        private HashSet<IMyCubeGrid> _ownershipSubscribedGrids = new HashSet<IMyCubeGrid>();
+        private static HashSet<IMyCubeGrid> _ownershipSubscribedGrids = new HashSet<IMyCubeGrid>();
 
         private HeatCommands _commandsInstance;
         public static HeatSession Instance { get; private set; }
@@ -49,6 +49,7 @@ namespace TSUT.HeatManagement
             // Load config (will use defaults if file doesn't exist)
             Config = Config.Instance;
             Instance = this;
+            MyLog.Default.WriteLine($"[HeatManagement] HeatSession instance created.");
 
             _heatApi.Registry.RegisterHeatBehaviorFactory(new BatteryHeatManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new VentHeatManagerFactory());
@@ -230,7 +231,7 @@ namespace TSUT.HeatManagement
                 {
                     manager.UpdateBlocksTemp(passedTime);
                 }
-                
+
                 foreach (var manager in _gridHeatManagers.Values)
                 {
                     manager.UpdateNeighborsTemp(passedTime);
@@ -359,19 +360,44 @@ namespace TSUT.HeatManagement
 
         public static void RebuildEverything()
         {
-            foreach (var manager in _gridHeatManagers.Values)
+            lock (_gridHeatManagers)
             {
-                manager.Cleanup();
+                foreach (var manager in _gridHeatManagers.Values)
+                {
+                    manager.Cleanup();
+                }
+                _gridHeatManagers.Clear();
             }
-            _gridHeatManagers.Clear();
-            
 
+            lock (_ownershipSubscribedGrids)
+            {
+                foreach (var grid in _ownershipSubscribedGrids)
+                {
+                    grid.OnBlockAdded -= Instance.OnBlockAdded;
+                }
+                _ownershipSubscribedGrids.Clear();
+            }
             HashSet<IMyEntity> allEntities = new HashSet<IMyEntity>();
             MyAPIGateway.Entities.GetEntities(allEntities);
             foreach (var entity in allEntities)
             {
+                if (!(entity is IMyCubeGrid) || IsWheelGrid(entity as IMyCubeGrid))
+                    continue;
+                if (_gridHeatManagers.ContainsKey(entity as IMyCubeGrid))
+                    continue;
+                if (_ownershipSubscribedGrids.Contains(entity as IMyCubeGrid))
+                    continue;
                 Instance.OnEntityAdd(entity);
             }
+        }
+
+        private static bool IsWheelGrid(IMyCubeGrid grid)
+        {
+            var slimBlocks = new List<IMySlimBlock>();
+            grid.GetBlocks(slimBlocks);
+
+            // wheel grids have exactly one block and it's a wheel part
+            return slimBlocks.Count == 1 && slimBlocks[0].FatBlock is IMyWheel;
         }
 
         private static void OnCustomControlGetter(IMyTerminalBlock block, List<IMyTerminalControl> controls)
@@ -497,7 +523,7 @@ namespace TSUT.HeatManagement
                             dt))
                 },
                 {
-                    "GetHmsConfig", new Func<object>(() => 
+                    "GetHmsConfig", new Func<object>(() =>
                         new Dictionary<string, object> {
                             { "HEAT_COOLDOWN_COEFF", Config.Instance.HEAT_COOLDOWN_COEFF },
                             { "HEAT_RADIATION_COEFF", Config.Instance.HEAT_RADIATION_COEFF },
