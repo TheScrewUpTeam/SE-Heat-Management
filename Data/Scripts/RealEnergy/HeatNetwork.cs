@@ -2,6 +2,7 @@ using System.Diagnostics.Contracts;
 using ProtoBuf;
 using Sandbox.ModAPI;
 using System;
+using System.Collections.Generic;
 
 namespace TSUT.HeatManagement
 {
@@ -11,6 +12,7 @@ namespace TSUT.HeatManagement
     [ProtoInclude(1002, typeof(HeatEventSettingsSync))]
     [ProtoInclude(1003, typeof(RequestHeatConfig))]
     [ProtoInclude(1004, typeof(HeatConfigResponse))]
+    [ProtoInclude(1005, typeof(HeatNetworkSyncMessage))]
 
     [ProtoContract]
     public abstract class PacketBase
@@ -46,6 +48,32 @@ namespace TSUT.HeatManagement
         public override bool Received()
         {
             HeatSession.UpdateUI(EntityId, Heat);
+
+            return false;
+        }
+    }
+
+    [ProtoContract]
+    public class HeatValuePair
+    {
+        [ProtoMember(1)] public long BlockId;
+        [ProtoMember(2)] public float Heat;
+    }
+
+    [ProtoContract]
+    public class HeatNetworkSyncMessage : PacketBase
+    {
+        public HeatNetworkSyncMessage() { } // Empty constructor required for deserialization
+
+        [ProtoMember(1)]
+        public long GridId;
+
+        [ProtoMember(2)]
+        public List<HeatValuePair> Heats;
+
+        public override bool Received()
+        {
+            HeatSession.UpdateNetowkrsUI(GridId, Heats);
 
             return false;
         }

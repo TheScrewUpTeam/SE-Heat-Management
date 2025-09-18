@@ -511,11 +511,11 @@ namespace TSUT.HeatManagement
             return deltaT * baseCoolingRate * effectiveness * deltaTime / GetThermalCapacity(thruster); // Joules removed
         }
 
-        public float ApplyHeatChange(IMyCubeBlock block, float heatChange)
+        public float ApplyHeatChange(IMyCubeBlock block, float heatChange, bool silent = false)
         {
             float currentHeat = GetHeat(block);
             float newHeat = currentHeat + heatChange;
-            SetHeat(block, currentHeat + heatChange);
+            SetHeat(block, currentHeat + heatChange, silent);
             return newHeat;
         }
 

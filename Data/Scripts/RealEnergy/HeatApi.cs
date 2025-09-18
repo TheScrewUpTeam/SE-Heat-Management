@@ -73,8 +73,8 @@ namespace TSUT.HeatManagement
         float GetThermalCapacity(IMyCubeBlock block);
         bool IsBlockInPressurizedRoom(IMyCubeBlock block);
         void PurgeCaches();
-        void SetHeat(IMyCubeBlock block, float heat, bool silent = true);
-        float ApplyHeatChange(IMyCubeBlock block, float heatChange);
+        void SetHeat(IMyCubeBlock block, float heat, bool silent = false);
+        float ApplyHeatChange(IMyCubeBlock block, float heatChange, bool silent = false);
         float GetBlockWindSpeed(IMyCubeBlock block);
         float GetExchangeWithNeighbor(IMyCubeBlock block, IMyCubeBlock neighbor, float deltaTime);
         float GetAirDensity(IMyCubeBlock block);

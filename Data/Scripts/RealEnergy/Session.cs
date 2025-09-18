@@ -339,6 +339,28 @@ namespace TSUT.HeatManagement
             }
         }
 
+        internal static void UpdateNetowkrsUI(long gridId, List<HeatValuePair> heats)
+        {
+            GridHeatManager manager;
+            if (_gridHeatManagers.TryGetValue(MyAPIGateway.Entities.GetEntityById(gridId) as IMyCubeGrid, out manager))
+            {
+                foreach (var heatPair in heats)
+                {
+                    var block = MyAPIGateway.Entities.GetEntityById(heatPair.BlockId) as IMyCubeBlock;
+                    if (block != null)
+                    {
+                        continue;
+                    }
+                    var heat = heatPair.Heat;
+                    _heatApi.Utils.SetHeat(block, heat, true);
+                    if (manager.TryReactOnHeat(block, heat))
+                    {
+                        return;
+                    }
+                }
+            }
+        }
+
         public static void RegisterDebugControl()
         {
             if (_initialized)

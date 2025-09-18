@@ -731,6 +731,7 @@ namespace TSUT.HeatManagement
 
         public void SpreadHeat(float deltaTime)
         {
+            List<HeatValuePair> heatChanges = new List<HeatValuePair>();
             foreach (var node in _nodes)
             {
                 foreach (var edge in node.Connections)
@@ -761,10 +762,18 @@ namespace TSUT.HeatManagement
                         energyDelta = Math.Max(energyDelta, limit);
                     }
 
-                    HeatSession.Api.Utils.ApplyHeatChange(edge.A.Block, energyDelta / capA);
-                    HeatSession.Api.Utils.ApplyHeatChange(edge.B.Block, -energyDelta / capB);
+                    HeatSession.Api.Utils.ApplyHeatChange(edge.A.Block, energyDelta / capA, false);
+                    HeatSession.Api.Utils.ApplyHeatChange(edge.B.Block, -energyDelta / capB, false);
+                    heatChanges.Add(new HeatValuePair { BlockId = edge.A.Block.EntityId, Heat = energyDelta / capA });
+                    heatChanges.Add(new HeatValuePair { BlockId = edge.B.Block.EntityId, Heat = -energyDelta / capB });
                 }
             }
+            var msg = new HeatNetworkSyncMessage
+            {
+                GridId = _nodes[0].Block.CubeGrid.EntityId,
+                Heats = heatChanges
+            };
+            HeatSession.networking?.RelayToClients(msg);
         }
 
         public void Cleanup() => _nodes = null;
