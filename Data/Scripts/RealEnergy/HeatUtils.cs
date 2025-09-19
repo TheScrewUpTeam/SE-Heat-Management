@@ -385,12 +385,14 @@ namespace TSUT.HeatManagement
             {
                 // If there are atmo aroung - just exchange heat with it
                 energyLoss = (currentHeat - ambientTemp) * surfaceArea * Config.Instance.HEAT_COOLDOWN_COEFF * deltaTime;
+                energyLoss = ApplyExchangeLimit(energyLoss, thermalCapacity, thermalCapacity, currentHeat - ambientTemp);
             }
             else
             {
                 // If in space - radiate at least something
                 energyLoss = surfaceArea * Config.Instance.HEAT_RADIATION_COEFF * deltaTime;
             }
+
             float heatLoss = energyLoss / thermalCapacity; // °C lost
 
             return heatLoss;
@@ -402,12 +404,15 @@ namespace TSUT.HeatManagement
             float ambientTemp = CalculateAmbientTemperature(vent) - 10f; // 10 degrees lower than ambient to simulate cooling effect
             float airDensity = GetAirDensity(vent);
             float coolingPower = Config.Instance.VENT_COOLING_RATE * airDensity;
+            float capacity = GetThermalCapacity(vent);
 
             float tempDiff = currentTemp - ambientTemp;
 
-            float heatRemoved = coolingPower * deltaTime * tempDiff / GetThermalCapacity(vent); // Joules removed
+            float heatRemoved = coolingPower * deltaTime * tempDiff; // Joules removed
 
-            return heatRemoved;
+            heatRemoved = ApplyExchangeLimit(heatRemoved, capacity, capacity, tempDiff);
+
+            return heatRemoved / capacity;
         }
 
         public float GetHeatToDissipate(IMyCubeBlock block, float deltaTime)
@@ -424,12 +429,15 @@ namespace TSUT.HeatManagement
             float currentTemp = GetHeat(vent);
             float ambientTemp = CalculateAmbientTemperature(vent) - 10f; // 10 degrees lower than ambient to simulate cooling effect
             float coolingPower = Config.Instance.VENT_COOLING_RATE * airDensity;
+            float capacity = GetThermalCapacity(vent);
 
             float tempDiff = currentTemp - ambientTemp;
 
-            float heatRemoved = coolingPower * deltaTime * tempDiff / GetThermalCapacity(vent); // Joules removed
+            float heatRemoved = coolingPower * deltaTime * tempDiff; // Joules removed
 
-            return heatRemoved;
+            heatRemoved = ApplyExchangeLimit(heatRemoved, capacity, capacity, tempDiff);
+
+            return heatRemoved / capacity;
         }
 
         public float GetExchangeWithNeighbor(IMyCubeBlock block, IMyCubeBlock neighbor, float deltaTime)
@@ -480,12 +488,34 @@ namespace TSUT.HeatManagement
             return delta;
         }
 
+        public float ApplyExchangeLimit(float energyDelta, float capA, float capB, float tempDiff)
+        {
+            float limit;
+            // Limit energy exchange to half of the temperature difference * thermal capacity of the block
+            // This prevents over-exchange that would cause unrealistic temperature swings
+            // The division by 2 is a tunable parameter to allow some headroom
+
+            // Positive energyDelta means block A is losing heat, negative means gaining heat
+            // So we limit based on the block that is losing heat
+            if (energyDelta > 0)
+            {
+                limit = tempDiff * capB / 2;
+                return Math.Min(energyDelta, limit);
+            }
+            else
+            {
+                limit = tempDiff * capA / 2;
+                return Math.Max(energyDelta, limit);
+            }
+        }
+
         public float GetActiveExhaustHeatLoss(IMyExhaustBlock exhaust, float deltaTime)
         {
             float baseRate = Config.Instance.EXHAUST_HEAT_REJECTION_RATE; // Rename to be exhaust-specific
 
             float currentTemp = GetHeat(exhaust);
             float ambientTemp = CalculateAmbientTemperature(exhaust);
+            float capacity = GetThermalCapacity(exhaust);
             float deltaT = currentTemp - ambientTemp;
 
             // Base effectiveness modifier simulates diminishing return at very high delta-T (IRL heat rejection efficiency flattens)
@@ -495,20 +525,28 @@ namespace TSUT.HeatManagement
             float atmosphericFactor = MathHelper.Clamp(GetAirDensity(exhaust), 0.5f, 1f);
 
             float totalJoulesRemoved = deltaT * baseRate * efficiencyFactor * atmosphericFactor * deltaTime;
-            return totalJoulesRemoved / GetThermalCapacity(exhaust); // Return °C/sec
+
+            totalJoulesRemoved = ApplyExchangeLimit(totalJoulesRemoved, capacity, capacity, deltaT);
+
+            return totalJoulesRemoved /capacity; // Return °C/sec
         }
 
         public float GetActiveThrusterHeatLoss(IMyThrust thruster, float thrustRatio, float deltaTime)
         {
             float baseCoolingRate = Config.Instance.THRUSTER_COOLING_RATE; // Tunable parameter
             float effectiveness = MathHelper.Clamp(thrustRatio, 0f, 1f) * 10f;
+            float capacity = GetThermalCapacity(thruster);
 
             float ambientTemp = CalculateAmbientTemperature(thruster) - 10f; // 10 degrees lower than ambient to simulate cooling effect
             float currentTemp = GetHeat(thruster);
             float deltaT = currentTemp - ambientTemp;
 
+            float totalJoulesRemoved = deltaT * baseCoolingRate * effectiveness * deltaTime;
+
+            totalJoulesRemoved = ApplyExchangeLimit(totalJoulesRemoved, capacity, capacity, deltaT);
+
             // Cooling scales with thrust output
-            return deltaT * baseCoolingRate * effectiveness * deltaTime / GetThermalCapacity(thruster); // Joules removed
+            return totalJoulesRemoved / GetThermalCapacity(thruster); // Joules removed
         }
 
         public float ApplyHeatChange(IMyCubeBlock block, float heatChange, bool silent = false)

@@ -21,6 +21,8 @@ namespace TSUT.HeatManagement
             float cumulativeHeat = 0f;
             float tempOwn = HeatSession.Api.Utils.GetHeat(block);
             float capacityOwn = HeatSession.Api.Utils.GetThermalCapacity(block);
+            GridHeatManager gridHeatManager;
+            HeatSession.GetGridHeatManager(block.CubeGrid, out gridHeatManager);
 
             var neighborList = new List<IMySlimBlock>();
             block.SlimBlock.GetNeighbours(neighborList);
@@ -34,8 +36,11 @@ namespace TSUT.HeatManagement
                 float tempNeighbor = HeatSession.Api.Utils.GetHeat(neighborFat);
 
                 var behaviour = HeatSession.GetBehaviorForBlock(neighborFat);
+                var tempDiff = tempOwn - tempNeighbor;
 
                 var energyTransferred = HeatSession.Api.Utils.GetExchangeUniversal(block, neighborFat, deltaTime); // Get energy transferred in Joules
+
+                energyTransferred = HeatSession.Api.Utils.ApplyExchangeLimit(energyTransferred, capacityOwn, capacityNeighbot, tempDiff);
 
                 // Convert energy to delta-T for each block
                 float deltaOwn = energyTransferred / capacityOwn;
@@ -52,6 +57,15 @@ namespace TSUT.HeatManagement
                 float newTemp = tempNeighbor + deltaNeighbor - ambientLoss;
                 HeatSession.Api.Utils.SetHeat(neighborFat, newTemp);
                 HeatSession.Api.Effects.UpdateBlockHeatLight(neighborFat, newTemp);
+
+                if (gridHeatManager != null)
+                {
+                    IHeatBehavior behavior;
+                    if (gridHeatManager.TryGetBehaviorForBlock(neighborFat, out behavior) && behavior is IMultiBlockHeatBehavior)
+                    {
+                        (behavior as IMultiBlockHeatBehavior).MarkDirty();
+                    }
+                }                    
 
                 cumulativeHeat += deltaOwn;
             }

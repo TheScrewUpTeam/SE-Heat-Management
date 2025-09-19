@@ -13,6 +13,7 @@ namespace TSUT.HeatManagement
 {
     public class BatteryHeatManagerFactory : IHeatBehaviorFactory
     {
+
         public void CollectHeatBehaviors(IMyCubeGrid grid, IGridHeatManager manager, IDictionary<IMyCubeBlock, IHeatBehavior> behaviorMap)
         {
             List<IMyBatteryBlock> batteries = new List<IMyBatteryBlock>();
@@ -45,6 +46,7 @@ namespace TSUT.HeatManagement
 
     public class BatteryHeatManager : AHeatBehavior
     {
+        const int SECONDS_IN_HOUR = 3600;
         private IMyBatteryBlock _battery;
         private IGridHeatManager _gridManager;
 

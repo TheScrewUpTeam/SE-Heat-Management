@@ -136,5 +136,43 @@ namespace TSUT.HeatManagement
 
             tempPlayers.Clear();
         }
+
+        /// <summary>
+        /// Sends packet (or supplied bytes) to all players except server player and supplied packet's sender.
+        /// Only works server side.
+        /// </summary>
+        public void RelayToGridOwners(PacketBase packet, IMyCubeGrid grid, byte[] rawData = null)
+        {
+            if (!MyAPIGateway.Multiplayer.IsServer)
+                return;
+
+            var owners = grid.BigOwners;
+
+            if (tempPlayers == null)
+                tempPlayers = new List<IMyPlayer>(MyAPIGateway.Session.SessionSettings.MaxPlayers);
+            else
+                tempPlayers.Clear();
+
+            MyAPIGateway.Players.GetPlayers(tempPlayers, p => owners.Contains(p.IdentityId));
+
+            foreach (var p in tempPlayers)
+            {
+                if (p.IsBot)
+                    continue;
+
+                if (p.SteamUserId == MyAPIGateway.Multiplayer.ServerId)
+                    continue;
+
+                if (p.SteamUserId == packet.SenderId)
+                    continue;
+
+                if (rawData == null)
+                    rawData = MyAPIGateway.Utilities.SerializeToBinary(packet);
+
+                MyAPIGateway.Multiplayer.SendMessageTo(ChannelId, rawData, p.SteamUserId);
+            }
+
+            tempPlayers.Clear();
+        }
     }
 }

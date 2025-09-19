@@ -416,49 +416,6 @@ namespace TSUT.HeatManagement
                 }
             }
 
-
-            // // 1. Look for existing pipe connections
-            // foreach (var offset in neighborOffsets)
-            // {
-            //     var neighborPos = pos + offset;
-            //     var slim = grid.GetCubeBlock(neighborPos);
-            //     if (slim?.FatBlock == null)
-            //         continue;
-
-            //     var neighbor = slim.FatBlock;
-
-            //     if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-            //     {
-            //         MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] >> Found neighbor: {neighbor.DisplayNameText}");
-            //     }
-
-            //     foreach (var manager in gridPipeManagers)
-            //     {
-            //         if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-            //         {
-            //             MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] >> Nodes in manager: {manager.Nodes.Count}");
-            //         }
-            //         HeatPipeNode node = manager.TryGetNode(neighbor);
-            //         if (node == null)
-            //             continue;
-
-            //         if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-            //         {
-            //             MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] >> Found node");
-            //         }
-
-            //         if (ArePipesConnectedByGeometry(block, neighbor))
-            //         {
-            //             if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-            //             {
-            //                 MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] >> Connectable, add node");
-            //             }
-            //             connectedManagers.Add(manager);
-            //             neighborNodes[node] = manager;
-            //         }
-            //     }
-            // }
-
             if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
             {
                 MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] Found managers: {connectedManagers.Count}, nodes: {neighborNodes.Count}");
@@ -553,10 +510,12 @@ namespace TSUT.HeatManagement
 
             return null;
         }
-
+        const int NETWORK_BROADCAST_INTERVAL = 360; // in ticks
         private IGridHeatManager _gridManager;
         private List<HeatPipeNode> _nodes = new List<HeatPipeNode>();
         public List<HeatPipeNode> Nodes => _nodes;
+        private static int _lastNetworkBroadcastTick = 0;
+        private bool _dirty = false;
 
 
         public HeatPipeManager(IGridHeatManager manager)
@@ -731,6 +690,8 @@ namespace TSUT.HeatManagement
 
         public void SpreadHeat(float deltaTime)
         {
+            if (!_dirty)
+                return;
             List<HeatValuePair> heatChanges = new List<HeatValuePair>();
             foreach (var node in _nodes)
             {
@@ -768,12 +729,24 @@ namespace TSUT.HeatManagement
                     heatChanges.Add(new HeatValuePair { BlockId = edge.B.Block.EntityId, Heat = -energyDelta / capB });
                 }
             }
+            _dirty = false;
+            NotifyClients(heatChanges);
+        }
+
+        private void NotifyClients(List<HeatValuePair> heatChanges)
+        {
+            if (_lastNetworkBroadcastTick + NETWORK_BROADCAST_INTERVAL > HeatSession._tickCount)
+                return;
+
+            var grid = _nodes.First().Block.CubeGrid;
+
             var msg = new HeatNetworkSyncMessage
             {
-                GridId = _nodes[0].Block.CubeGrid.EntityId,
+                GridId = grid.EntityId,
                 Heats = heatChanges
             };
-            HeatSession.networking?.RelayToClients(msg);
+            HeatSession.networking.RelayToGridOwners(msg, grid);
+            _lastNetworkBroadcastTick = HeatSession._tickCount;
         }
 
         public void Cleanup() => _nodes = null;
@@ -963,6 +936,11 @@ namespace TSUT.HeatManagement
                 totalTemp += HeatSession.Api.Utils.GetHeat(node.Block);
             }
             return totalTemp / _nodes.Count;
+        }
+
+        public void MarkDirty()
+        {
+            _dirty = true;
         }
     }
 

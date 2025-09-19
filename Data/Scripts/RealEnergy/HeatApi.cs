@@ -33,6 +33,7 @@ namespace TSUT.HeatManagement
     {
         void RemoveBlock(IMyCubeBlock block, IGridHeatManager gridManager, Dictionary<IMyCubeBlock, IHeatBehavior> behaviorMap);
         void ShowDebugGraph(float deltaTime);
+        void MarkDirty();
     }
 
     public interface IHeatBehaviorFactory
@@ -82,6 +83,7 @@ namespace TSUT.HeatManagement
         float GetExchangeWithNetwork(IMyCubeBlock block, IMyCubeBlock networkBlock, float deltaTime);
         float GetExchangeUniversal(IMyCubeBlock block, IMyCubeBlock neighborBlock, float deltaTime);
         float GetHeatToDissipate(IMyCubeBlock block, float deltaTime);
+        float ApplyExchangeLimit(float energyDelta, float capA, float capB, float tempDiff);
     }
 
     public interface IHeatEffects

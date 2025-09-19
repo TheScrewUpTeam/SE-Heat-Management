@@ -19,6 +19,7 @@ namespace TSUT.HeatManagement
     public class HeatSession : MySessionComponentBase
     {
         const int MAIN_UPDATE_INTERVAL = 30; // in ticks
+        const int NEIGHBOR_UPDATE_INTERVAL = 120; // in ticks
 
         private static HeatApi _heatApi = new HeatApi();
 
@@ -32,8 +33,9 @@ namespace TSUT.HeatManagement
         private static Dictionary<IMyCubeGrid, GridHeatManager> _gridHeatManagers = new Dictionary<IMyCubeGrid, GridHeatManager>();
 
         private static bool _initialized = false;
-        private int _tickCount = 0;
+        public static int _tickCount = 0;
         private int _lastMainUpdateTick = 0;
+        private int _lastNeighborUpdateTick = 0;
 
         private static Dictionary<long, IHeatBehavior> _trackedNetworkBlocks = new Dictionary<long, IHeatBehavior>();
 
@@ -138,6 +140,7 @@ namespace TSUT.HeatManagement
             {
                 manager.Cleanup();
                 _gridHeatManagers.Remove(grid);
+                MyLog.Default.WriteLine($"[HeatManagement] Grid added. Total grids with heat management: {_gridHeatManagers.Count}");
             }
             if (_ownershipSubscribedGrids.Contains(grid))
             {
@@ -150,6 +153,14 @@ namespace TSUT.HeatManagement
         {
             var grid = entity as IMyCubeGrid;
             if (grid == null) return;
+            if (IsWheelGrid(grid))
+                return;
+            if (_gridHeatManagers.ContainsKey(grid))
+                return;
+            if (_ownershipSubscribedGrids.Contains(grid))
+                return;
+
+            MyLog.Default.WriteLine($"[HeatManagement] Processing grid {grid.DisplayName} ({grid.EntityId})");
 
             // Always subscribe to ownership changes for all terminal blocks
             if (!_ownershipSubscribedGrids.Contains(grid))
@@ -169,6 +180,8 @@ namespace TSUT.HeatManagement
                 return;
 
             _gridHeatManagers[grid] = new GridHeatManager(grid);
+
+            MyLog.Default.WriteLine($"[HeatManagement] Grid added. Total grids with heat management: {_gridHeatManagers.Count}");
         }
 
         private static bool IsPlayrGrid(IMyCubeGrid grid)
@@ -231,13 +244,12 @@ namespace TSUT.HeatManagement
                 {
                     manager.UpdateBlocksTemp(passedTime);
                 }
-
                 foreach (var manager in _gridHeatManagers.Values)
                 {
                     manager.UpdateNeighborsTemp(passedTime);
                 }
                 _lastMainUpdateTick = _tickCount;
-            }
+            }                
         }
 
         private void ClientSideUpdates()
@@ -341,23 +353,44 @@ namespace TSUT.HeatManagement
 
         internal static void UpdateNetowkrsUI(long gridId, List<HeatValuePair> heats)
         {
-            GridHeatManager manager;
-            if (_gridHeatManagers.TryGetValue(MyAPIGateway.Entities.GetEntityById(gridId) as IMyCubeGrid, out manager))
+            try
             {
+                MyLog.Default.WriteLine($"[HeatManagement] Received network heat update for grid {gridId} with {heats.Count} entries.");
+                IMyEntity entity = MyAPIGateway.Entities.GetEntityById(gridId);
+                if (entity == null)
+                {
+                    MyLog.Default.WriteLine($"[HeatManagement] Could not find grid with ID {gridId}.");
+                    return;
+                }
+                var grid = entity as IMyCubeGrid;
+                if (grid == null)
+                {
+                    MyLog.Default.WriteLine($"[HeatManagement] Entity with ID {gridId} is not a grid.");
+                    return;
+                }
+                MyLog.Default.WriteLine($"[HeatManagement] Found grid {grid.DisplayName}.");
+                GridHeatManager manager;
+                if (!_gridHeatManagers.TryGetValue(grid as IMyCubeGrid, out manager))
+                {
+                    return;
+                }
+                MyLog.Default.WriteLine($"[HeatManagement] Found grid manager.");
                 foreach (var heatPair in heats)
                 {
                     var block = MyAPIGateway.Entities.GetEntityById(heatPair.BlockId) as IMyCubeBlock;
-                    if (block != null)
+                    if (block == null)
                     {
                         continue;
                     }
                     var heat = heatPair.Heat;
                     _heatApi.Utils.SetHeat(block, heat, true);
-                    if (manager.TryReactOnHeat(block, heat))
-                    {
-                        return;
-                    }
+                    manager.TryReactOnHeat(block, heat);
                 }
+                MyLog.Default.WriteLine($"[HeatManagement] Updated {heats.Count} blocks.");
+            }
+            catch (Exception e)
+            {
+                MyLog.Default.WriteLine($"[HeatManagement] Exception in UpdateNetowkrsUI: {e}");
             }
         }
 
@@ -403,12 +436,6 @@ namespace TSUT.HeatManagement
             MyAPIGateway.Entities.GetEntities(allEntities);
             foreach (var entity in allEntities)
             {
-                if (!(entity is IMyCubeGrid) || IsWheelGrid(entity as IMyCubeGrid))
-                    continue;
-                if (_gridHeatManagers.ContainsKey(entity as IMyCubeGrid))
-                    continue;
-                if (_ownershipSubscribedGrids.Contains(entity as IMyCubeGrid))
-                    continue;
                 Instance.OnEntityAdd(entity);
             }
         }
