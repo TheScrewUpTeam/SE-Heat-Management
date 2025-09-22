@@ -6,7 +6,7 @@ namespace TSUT.HeatManagement
 {
     public class Config : IConfig
     {
-        public static string Version = "1.2.3";
+        public static string Version = "1.2.4";
         public static ushort HeatSyncMessageId = 7949; // Choose any unused ushort value
 
         public static ushort BlockHeatEventUniqueId = 17949; // Unique ID for block heat events
@@ -16,7 +16,7 @@ namespace TSUT.HeatManagement
 
         public static string HeatDebugString = "HeatDebug";
 
-        public string HEAT_SYSTEM_VERSION = "1.2.3";
+        public string HEAT_SYSTEM_VERSION = "1.2.4";
         public bool HEAT_SYSTEM_AUTO_UPDATE = true;
         public float HEAT_COOLDOWN_COEFF { get; set; } = 20f;
         public float HEAT_RADIATION_COEFF { get; set; } = 5f;
@@ -33,6 +33,14 @@ namespace TSUT.HeatManagement
         public float HEATPIPE_CONDUCTIVITY { get; set; } = 3000f;
         public float EXHAUST_HEAT_REJECTION_RATE { get; set; } = 5000f; // Used for exhaust block heat rejection rate
         public bool HEAT_GLOW_INDICATION { get; set; } = true;
+        public int MAIN_UPDATE_INTERVAL_TICKS { get; set; } = 30; // in ticks
+        public int UPDATE_INTERVAL_SCALE_50 { get; set; } = 1; // x1 means update every 1/2 second (30 ticks)
+        public int UPDATE_INTERVAL_SCALE_100 { get; set; } = 3; // x3 means update every 1.5 seconds (90 ticks)
+        public int UPDATE_INTERVAL_SCALE_400 { get; set; } = 4; // x4 means update every 2 seconds (120 ticks)
+        public int UPDATE_INTERVAL_SCALE_1000 { get; set; } = 10; // x10 means update every 5 seconds (300 ticks)
+        public int UPDATE_INTERVAL_SCALE_1500 { get; set; } = 15; // x15 means update every 7.5 seconds (450 ticks)
+        public int UPDATE_INTERVAL_SCALE_2000 { get; set; } = 30; // x30 means update every 15 seconds (900 ticks)
+        public int UPDATE_INTERVAL_SCALE_ENOURMOUS { get; set; } = 120; // x120 means update every 60 seconds (3600 ticks)
 
         private static Config _instance;
         private const string CONFIG_FILE = "TSUT_HeatManagement_Config.xml";

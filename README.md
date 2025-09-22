@@ -53,7 +53,13 @@ See the [Configuration Guide](CONFIGURATION.md) for detailed instructions on all
   - `HEAT_GLOW_INDICATION` (true/false) — Toggle visual heat glow effects.
   - `DISCHARGE_HEAT_CONFIGURABLE` (true/false) — Enable custom heat settings for battery discharge.
   - `HEATPIPE_CONDUCTIVITY` — Control the efficiency of heat pipe networks.
+  - **Performance settings** — Fine-tune update intervals based on grid sizes:
+    - Configurable base update interval for the entire heat system
+    - Granular control over update frequency for different grid sizes
+    - Optimize performance for servers with many players
+    - Balance between simulation accuracy and server load
 - The mod will always use the config from your current save, so each world can have its own heat rules.
+- Server administrators can optimize performance through update interval scaling based on grid sizes.
 
 ---
 

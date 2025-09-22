@@ -46,7 +46,6 @@ namespace TSUT.HeatManagement
 
     public class BatteryHeatManager : AHeatBehavior
     {
-        const int SECONDS_IN_HOUR = 3600;
         private IMyBatteryBlock _battery;
         private IGridHeatManager _gridManager;
 
@@ -133,7 +132,13 @@ namespace TSUT.HeatManagement
             var heat = HeatSession.Api.Utils.GetHeat(block);
             float heatChange = GetHeatChange(1f) - cumulativeNeighborHeatChange - cumulativeNetworkHeatChange; // Assuming deltaTime of 1 second for display purposes
 
+            var mode = _gridManager.GetScaleBasedOnBlocksCount();
+
             info.AppendLine($"--- Heat Management ---");
+            if (mode > 1)
+            {
+                info.AppendLine($"(Slow Mode x{mode}) Update in: {_gridManager.GetTicksTillNextUpdate() * MyEngineConstants.UPDATE_STEP_SIZE_IN_SECONDS} seconds");
+            }
             info.AppendLine($"Temperature: {heat:F2} °C");
             string heatStatus = heatChange > 0 ? "Heating" : heatChange < -0.01 ? "Cooling" : "Stable";
             info.AppendLine($"Thermal Status: {heatStatus}");

@@ -511,16 +511,26 @@ namespace TSUT.HeatManagement
             return null;
         }
         const int NETWORK_BROADCAST_INTERVAL = 360; // in ticks
+        private const float MIN_TEMP_DIFFERENCE = 0.1f; // Skip heat transfer below this difference
+
         private IGridHeatManager _gridManager;
         private List<HeatPipeNode> _nodes = new List<HeatPipeNode>();
         public List<HeatPipeNode> Nodes => _nodes;
         private static int _lastNetworkBroadcastTick = 0;
         private bool _dirty = false;
+        private int _currentSegment = 0;
+        private float _accumulatedTime = 0;
+        
+        // Cache for batch processing
+        private Dictionary<IMyCubeBlock, float> _heatCache;
+        private Dictionary<IMyCubeBlock, float> _capacityCache;
+        private Dictionary<IMyCubeBlock, float> _deltaHeat;
 
 
         public HeatPipeManager(IGridHeatManager manager)
         {
             _gridManager = manager;
+            InitializeCaches();
         }
 
         public float GetHeatChange(float deltaTime) => 0f;
@@ -688,12 +698,34 @@ namespace TSUT.HeatManagement
             return energyTransferred;
         }
 
-        public void SpreadHeat(float deltaTime)
+        private void InitializeCaches()
         {
-            if (!_dirty)
-                return;
-            List<HeatValuePair> heatChanges = new List<HeatValuePair>();
+            if (_heatCache == null)
+            {
+                _heatCache = new Dictionary<IMyCubeBlock, float>(_nodes.Count);
+                _capacityCache = new Dictionary<IMyCubeBlock, float>(_nodes.Count);
+                _deltaHeat = new Dictionary<IMyCubeBlock, float>(_nodes.Count);
+            }
+            
+            _heatCache.Clear();
+            _deltaHeat.Clear();
+        }
+
+        private void ProcessSegment(IEnumerable<HeatPipeNode> nodes, float deltaTime)
+        {
+            InitializeCaches();
+
+            // Pre-cache values for all nodes in the network
             foreach (var node in _nodes)
+            {
+                _heatCache[node.Block] = HeatSession.Api.Utils.GetHeat(node.Block);
+                if (!_capacityCache.ContainsKey(node.Block))
+                    _capacityCache[node.Block] = HeatSession.Api.Utils.GetThermalCapacity(node.Block);
+                _deltaHeat[node.Block] = 0f;
+            }
+
+            // Process heat transfer for the current segment
+            foreach (var node in nodes)
             {
                 foreach (var edge in node.Connections)
                 {
@@ -701,36 +733,92 @@ namespace TSUT.HeatManagement
                     if (edge.A != node)
                         continue;
 
-                    float tempA = HeatSession.Api.Utils.GetHeat(edge.A.Block);
-                    float tempB = HeatSession.Api.Utils.GetHeat(edge.B.Block);
-
-                    float capA = HeatSession.Api.Utils.GetThermalCapacity(edge.A.Block);
-                    float capB = HeatSession.Api.Utils.GetThermalCapacity(edge.B.Block);
-
+                    float tempA = _heatCache[edge.A.Block];
+                    float tempB = _heatCache[edge.B.Block];
                     float tempDiff = tempB - tempA;
+
+                    // Skip negligible temperature differences
+                    if (Math.Abs(tempDiff) < MIN_TEMP_DIFFERENCE)
+                        continue;
+
+                    float capA = _capacityCache[edge.A.Block];
+                    float capB = _capacityCache[edge.B.Block];
+
                     float energyDelta = tempDiff * edge.Conductance * deltaTime;
-                    float limit;
 
                     // Limited to factual energy in the block
                     if (energyDelta > 0)
                     {
-                        limit = tempDiff * capB / 2;
-                        energyDelta = Math.Min(energyDelta, limit);
+                        energyDelta = Math.Min(energyDelta, tempDiff * capB / 2);
                     }
                     else
                     {
-                        limit = tempDiff * capA / 2;
-                        energyDelta = Math.Max(energyDelta, limit);
+                        energyDelta = Math.Max(energyDelta, tempDiff * capA / 2);
                     }
 
-                    HeatSession.Api.Utils.ApplyHeatChange(edge.A.Block, energyDelta / capA, false);
-                    HeatSession.Api.Utils.ApplyHeatChange(edge.B.Block, -energyDelta / capB, false);
-                    heatChanges.Add(new HeatValuePair { BlockId = edge.A.Block.EntityId, Heat = energyDelta / capA });
-                    heatChanges.Add(new HeatValuePair { BlockId = edge.B.Block.EntityId, Heat = -energyDelta / capB });
+                    // Accumulate changes
+                    _deltaHeat[edge.A.Block] += energyDelta / capA;
+                    _deltaHeat[edge.B.Block] -= energyDelta / capB;
+
+                    // Update cached temperatures for next iteration
+                    _heatCache[edge.A.Block] += energyDelta / capA;
+                    _heatCache[edge.B.Block] -= energyDelta / capB;
                 }
             }
-            _dirty = false;
-            NotifyClients(heatChanges);
+        }
+
+        public void SpreadHeat(float deltaTime)
+        {
+            if (!_dirty)
+                return;
+
+            var segmentSize = _nodes.Count;
+
+            // Get grid scale and total update interval
+            int gridScale = _gridManager.GetScaleBasedOnBlocksCount();
+            if (gridScale > 1)
+            {
+                segmentSize = segmentSize / gridScale + 1;
+            }
+            
+            // Accumulate time
+            _accumulatedTime += deltaTime;
+
+            // Calculate which nodes to process this tick
+            int totalSegments = _nodes.Count / segmentSize;
+            int nodesPerSegment = (_nodes.Count + totalSegments - 1) / totalSegments;
+            int startIdx = _currentSegment * nodesPerSegment + 1;
+            int endIdx = Math.Min(startIdx + nodesPerSegment, _nodes.Count);
+            
+            var segmentNodes = _nodes.Skip(startIdx).Take(endIdx - startIdx);
+            if (_nodes.First().Block.CubeGrid.CustomName.Contains(Config.HeatDebugString)) {
+                MyLog.Default.WriteLine($"[HeatManagement] HeatPipe #{GetHashCode()} ({_nodes.Count}) processing segment {_currentSegment + 1}/{totalSegments} with {_accumulatedTime:F3}s accumulated time, nodes {startIdx}-{endIdx - 1}");
+            }
+
+            // Process segment using accumulated time
+                ProcessSegment(segmentNodes, _accumulatedTime);
+            
+            // Apply heat changes
+            foreach (var kvp in _deltaHeat)
+            {
+                if (Math.Abs(kvp.Value) > 1e-6f)
+                {
+                    HeatSession.Api.Utils.ApplyHeatChange(kvp.Key, kvp.Value);
+                }
+            }
+
+            // Clear accumulated time and dirty flag when we finish all segments
+            bool isLastSegment = _currentSegment >= totalSegments - 1;
+            if (isLastSegment)
+            {
+                _accumulatedTime = 0f;
+                _dirty = false;
+                _currentSegment = 0;
+            }
+            else
+            {
+                _currentSegment++;
+            }
         }
 
         private void NotifyClients(List<HeatValuePair> heatChanges)

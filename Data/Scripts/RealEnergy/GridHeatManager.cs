@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using VRage.Game.ModAPI;
 using VRage.Utils;
 using System.Linq;
-using System.Reflection;
 using Sandbox.ModAPI;
 using Sandbox.Game.Entities;
 
@@ -15,6 +14,10 @@ namespace TSUT.HeatManagement
         private readonly IMyCubeGrid _grid;
         private readonly Dictionary<IMyCubeBlock, IHeatBehavior> _heatBehaviors = new Dictionary<IMyCubeBlock, IHeatBehavior>();
         private bool _showDebug = false;
+        private int blockCallCount = 0;
+        private int neighborCallCount = 0;
+        private float blocksTimeAccumulator = 0f;
+        private float neighborsTimeAccumulator = 0f;
 
         public GridHeatManager(IMyCubeGrid grid, bool lazy = false)
         {
@@ -168,6 +171,13 @@ namespace TSUT.HeatManagement
 
         public void UpdateBlocksTemp(float deltaTime)
         {
+            blockCallCount++;
+            blocksTimeAccumulator += deltaTime;
+            int scale = GetScaleBasedOnBlocksCount();
+            if (blockCallCount % scale != 0)
+            {
+                return;
+            }
             HashSet<IHeatBehavior> called = new HashSet<IHeatBehavior>();
 
             // Update heat for each block
@@ -183,12 +193,12 @@ namespace TSUT.HeatManagement
                 {
                     if (behavior is IMultiBlockHeatBehavior)
                     {
-                        behavior.SpreadHeat(deltaTime);
+                        behavior.SpreadHeat(blocksTimeAccumulator);
                         behavior.ReactOnNewHeat(0f);
                     }
                     else
                     {
-                        float heatChange = behavior.GetHeatChange(deltaTime);
+                        float heatChange = behavior.GetHeatChange(blocksTimeAccumulator);
                         if (heatChange != 0f)
                         {
                             float newHeat = HeatSession.Api.Utils.ApplyHeatChange(block, heatChange);
@@ -201,10 +211,46 @@ namespace TSUT.HeatManagement
                     MyLog.Default.Warning($"[HeatManagement] Behavior {behavior.GetType().Name} threw exception on update: {ex}");
                 }
             }
+            blocksTimeAccumulator = 0;
+        }
+
+        public int GetScaleBasedOnBlocksCount()
+        {
+            if (_heatBehaviors.Count <= 50)
+                return Config.Instance.UPDATE_INTERVAL_SCALE_50;
+            else if (_heatBehaviors.Count <= 100)
+                return Config.Instance.UPDATE_INTERVAL_SCALE_100;
+            else if (_heatBehaviors.Count <= 400)
+                return Config.Instance.UPDATE_INTERVAL_SCALE_400;
+            else if (_heatBehaviors.Count <= 1000)
+                return Config.Instance.UPDATE_INTERVAL_SCALE_1000;
+            else if (_heatBehaviors.Count <= 1500)
+                return Config.Instance.UPDATE_INTERVAL_SCALE_1500;
+            else if (_heatBehaviors.Count <= 2000)
+                return Config.Instance.UPDATE_INTERVAL_SCALE_2000;
+            else
+                return Config.Instance.UPDATE_INTERVAL_SCALE_ENOURMOUS;
+        }
+
+        public int GetTicksTillNextUpdate()
+        {
+            int scale = GetScaleBasedOnBlocksCount();
+            int ticksPerUpdate = Config.Instance.MAIN_UPDATE_INTERVAL_TICKS * scale;
+            int ticksSinceLastUpdate = (blockCallCount % scale) * Config.Instance.MAIN_UPDATE_INTERVAL_TICKS;
+            return ticksPerUpdate - ticksSinceLastUpdate;
         }
 
         public void UpdateNeighborsTemp(float deltaTime)
         {
+            neighborCallCount++;
+            neighborsTimeAccumulator += deltaTime;
+            int scale = GetScaleBasedOnBlocksCount();
+            // We always update pipe networks, HeatPipeManager has it's own control system
+            UpdatePipeNetworks(deltaTime);
+            if (neighborCallCount % scale != 0)
+            {
+                return;
+            }
             HashSet<IHeatBehavior> called = new HashSet<IHeatBehavior>();
 
             // Spread heat between neighbors
@@ -220,11 +266,37 @@ namespace TSUT.HeatManagement
                 IHeatBehavior behavior = kvp.Value;
                 try
                 {
-                    behavior.SpreadHeat(deltaTime);
+                    behavior.SpreadHeat(neighborsTimeAccumulator);
                 }
                 catch (Exception ex)
                 {
                     MyLog.Default.Warning($"[HeatManagement] Behavior {behavior.GetType().Name} threw exception on spread heat: {ex}");
+                }
+            }
+            neighborsTimeAccumulator = 0;
+        }
+
+        private void UpdatePipeNetworks(float deltaTime)
+        {
+            HashSet<IHeatBehavior> called = new HashSet<IHeatBehavior>();
+            foreach (var kvp in _heatBehaviors)
+            {
+                if (called.Contains(kvp.Value))
+                    continue;
+                called.Add(kvp.Value);
+
+                if (kvp.Value is HeatPipeManager)
+                {
+                    var behavior = kvp.Value;
+                    try
+                    {
+                        behavior.SpreadHeat(deltaTime); // Pass raw deltaTime, not accumulated
+                        behavior.ReactOnNewHeat(0f);
+                    }
+                    catch (Exception ex)
+                    {
+                        MyLog.Default.Warning($"[HeatManagement] Behavior {behavior.GetType().Name} threw exception on update: {ex}");
+                    }
                 }
             }
         }

@@ -19,6 +19,8 @@ namespace TSUT.HeatManagement
         void SetShowDebug(bool flag);
         bool GetShowDebug();
         bool TryReactOnHeat(IMyCubeBlock block, float heat);
+        int GetScaleBasedOnBlocksCount();
+        int GetTicksTillNextUpdate();
     }
 
     public interface IHeatBehavior

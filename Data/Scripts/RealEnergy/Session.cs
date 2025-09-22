@@ -18,9 +18,6 @@ namespace TSUT.HeatManagement
     [MySessionComponentDescriptor(MyUpdateOrder.BeforeSimulation)]
     public class HeatSession : MySessionComponentBase
     {
-        const int MAIN_UPDATE_INTERVAL = 30; // in ticks
-        const int NEIGHBOR_UPDATE_INTERVAL = 120; // in ticks
-
         private static HeatApi _heatApi = new HeatApi();
 
         public static HeatApi Api
@@ -35,7 +32,6 @@ namespace TSUT.HeatManagement
         private static bool _initialized = false;
         public static int _tickCount = 0;
         private int _lastMainUpdateTick = 0;
-        private int _lastNeighborUpdateTick = 0;
 
         private static Dictionary<long, IHeatBehavior> _trackedNetworkBlocks = new Dictionary<long, IHeatBehavior>();
 
@@ -235,7 +231,7 @@ namespace TSUT.HeatManagement
 
         private void ServerSideUpdates()
         {
-            if (_tickCount % MAIN_UPDATE_INTERVAL == 0)
+            if (_tickCount % Config.MAIN_UPDATE_INTERVAL_TICKS == 0)
             {
                 float passedTicks = _tickCount - _lastMainUpdateTick;
                 float passedTime = passedTicks * MyEngineConstants.UPDATE_STEP_SIZE_IN_SECONDS;
@@ -263,7 +259,7 @@ namespace TSUT.HeatManagement
                 manager.UpdateVisuals(MyEngineConstants.UPDATE_STEP_SIZE_IN_SECONDS);
             }
 
-            if (_tickCount % MAIN_UPDATE_INTERVAL == 0)
+            if (_tickCount % Config.MAIN_UPDATE_INTERVAL_TICKS == 0)
             {
                 var eventControllers = _heatApi.Registry.GetEventControllerEvents();
                 // Notify all event controller events
