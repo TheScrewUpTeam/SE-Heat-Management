@@ -30,8 +30,10 @@ namespace TSUT.HeatManagement
             {
                 HeatSession.RebuildEverything();
                 MyAPIGateway.Utilities.ShowMessage("HeatManagement", "Heat networks refreshed.");
+                sendToOthers = false; // Prevent the message from being sent to other players
+                return;
             }
-            sendToOthers = false; // Prevent the message from being sent to other players
+            sendToOthers = true; // Allow other messages to be sent to other players
         }
         
         public void Unload()
