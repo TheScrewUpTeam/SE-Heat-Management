@@ -191,12 +191,7 @@ namespace TSUT.HeatManagement
                 IHeatBehavior behavior = kvp.Value;
                 try
                 {
-                    if (behavior is IMultiBlockHeatBehavior)
-                    {
-                        behavior.SpreadHeat(blocksTimeAccumulator);
-                        behavior.ReactOnNewHeat(0f);
-                    }
-                    else
+                    if (!(behavior is IMultiBlockHeatBehavior))
                     {
                         float heatChange = behavior.GetHeatChange(blocksTimeAccumulator);
                         if (heatChange != 0f)

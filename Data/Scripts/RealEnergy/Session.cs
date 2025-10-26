@@ -236,16 +236,17 @@ namespace TSUT.HeatManagement
                 float passedTicks = _tickCount - _lastMainUpdateTick;
                 float passedTime = passedTicks * MyEngineConstants.UPDATE_STEP_SIZE_IN_SECONDS;
 
-                foreach (var manager in _gridHeatManagers.Values)
+                lock (_gridHeatManagers)
                 {
-                    manager.UpdateBlocksTemp(passedTime);
-                }
-                foreach (var manager in _gridHeatManagers.Values)
-                {
-                    manager.UpdateNeighborsTemp(passedTime);
+                    var managers = _gridHeatManagers.Values.ToList();
+                    foreach (var manager in managers)
+                    {
+                        manager.UpdateBlocksTemp(passedTime);
+                        manager.UpdateNeighborsTemp(passedTime);
+                    }
                 }
                 _lastMainUpdateTick = _tickCount;
-            }                
+            }
         }
 
         private void ClientSideUpdates()
@@ -261,7 +262,7 @@ namespace TSUT.HeatManagement
 
             if (_tickCount % Config.MAIN_UPDATE_INTERVAL_TICKS == 0)
             {
-                var eventControllers = _heatApi.Registry.GetEventControllerEvents();
+                var eventControllers = new List<IEventControllerEvent>(_heatApi.Registry.GetEventControllerEvents());
                 // Notify all event controller events
                 foreach (var eventControllerEvent in eventControllers)
                 {
