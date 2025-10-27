@@ -12,6 +12,7 @@ namespace TSUT.HeatManagement
         public abstract void SpreadHeat(float deltaTime);
         public abstract void Cleanup();
         public abstract void ReactOnNewHeat(float heat);
+        public abstract IMyCubeBlock Block { get; }
 
         public void SpreadHeatStandard(IMyCubeBlock block, float deltaTime)
         {

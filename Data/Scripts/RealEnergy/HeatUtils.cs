@@ -440,17 +440,22 @@ namespace TSUT.HeatManagement
             return heatRemoved / capacity;
         }
 
-        public float GetExchangeWithNeighbor(IMyCubeBlock block, IMyCubeBlock neighbor, float deltaTime)
+        public float GetExchangeWithNeighbor(IMyCubeBlock block, IMyCubeBlock neighbor, float deltaTime, float conductivity = -1f)
         {
             if (neighbor == null || block == null)
                 return 0f;
+                
+            if (conductivity < 0f)
+            {
+                conductivity = Config.Instance.THERMAL_CONDUCTIVITY;
+            }
 
             float ownTemp = HeatSession.Api.Utils.GetHeat(block);
             float neighborTemp = HeatSession.Api.Utils.GetHeat(neighbor);
 
             float tempDiff = ownTemp - neighborTemp;
             float contactArea = HeatSession.Api.Utils.GetLargestFaceArea(neighbor.SlimBlock);
-            float energyTransferred = tempDiff * Config.Instance.THERMAL_CONDUCTIVITY * contactArea * deltaTime; // Arbitrary scaling factor for transfer rate
+            float energyTransferred = tempDiff * conductivity * contactArea * deltaTime; // Arbitrary scaling factor for transfer rate
 
             return energyTransferred;
         }

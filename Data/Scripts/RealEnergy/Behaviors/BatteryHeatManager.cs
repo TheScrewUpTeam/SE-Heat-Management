@@ -49,6 +49,8 @@ namespace TSUT.HeatManagement
         private IMyBatteryBlock _battery;
         private IGridHeatManager _gridManager;
 
+        public override IMyCubeBlock Block => _battery;
+
         public BatteryHeatManager(IMyBatteryBlock battery, IGridHeatManager manager)
         {
             _battery = battery;

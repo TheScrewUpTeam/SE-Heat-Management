@@ -516,6 +516,9 @@ namespace TSUT.HeatManagement
         private IGridHeatManager _gridManager;
         private List<HeatPipeNode> _nodes = new List<HeatPipeNode>();
         public List<HeatPipeNode> Nodes => _nodes;
+
+        public IMyCubeBlock Block => _nodes.FirstOrDefault()?.Block;
+
         private static int _lastNetworkBroadcastTick = 0;
         private bool _dirty = false;
         private int _currentSegment = 0;

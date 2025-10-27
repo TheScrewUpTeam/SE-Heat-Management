@@ -43,6 +43,8 @@ namespace TSUT.HeatManagement
         private IGridHeatManager _gridManager;
         private IMyHeatVent _vent;
 
+        public override IMyCubeBlock Block => _vent;
+
         public HeatVentManager(IMyHeatVent vent, IGridHeatManager manager)
         {
             _vent = vent;

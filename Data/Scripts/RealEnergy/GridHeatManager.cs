@@ -56,7 +56,7 @@ namespace TSUT.HeatManagement
                         var block = MyAPIGateway.Entities.GetEntityById(blockId) as MyCubeBlock;
                         if (block != null && !_heatBehaviors.ContainsKey(block))
                         {
-                            _heatBehaviors[block] = new DelegateHeatBehavior(behavior);
+                            _heatBehaviors[block] = new DelegateHeatBehavior(behavior, block);
                         }
                     }
                 }
@@ -135,6 +135,7 @@ namespace TSUT.HeatManagement
                         {
                             _heatBehaviors[affected] = result.Behavior;
                         }
+                        // MyLog.Default.WriteLineAndConsole($"[HeatManagement] Result processed, {_heatBehaviors.Count} on grid");
                     }
                 }
                 catch (Exception ex)
@@ -155,7 +156,7 @@ namespace TSUT.HeatManagement
                     {
                         continue;
                     }
-                    IHeatBehavior behavior = new DelegateHeatBehavior(logic);
+                    IHeatBehavior behavior = new DelegateHeatBehavior(logic, block.FatBlock);
                     if (behavior != null)
                     {
                         _heatBehaviors[block.FatBlock] = behavior;
@@ -339,6 +340,15 @@ namespace TSUT.HeatManagement
                 .ToList();
         }
 
+        public List<T> GetSpecificManagers<T>()
+        {
+            // Return all IHeatBehavior values that are HeatPipeManager
+            return _heatBehaviors.Values
+                .OfType<T>()
+                .Distinct()
+                .ToList();
+        }
+
         public void SetShowDebug(bool flag)
         {
             _showDebug = flag;
@@ -412,10 +422,14 @@ namespace TSUT.HeatManagement
     public class DelegateHeatBehavior : IHeatBehavior
     {
         private readonly IDictionary<string, object> _logic;
+        private IMyCubeBlock _block;
 
-        public DelegateHeatBehavior(IDictionary<string, object> logic)
+        public IMyCubeBlock Block => _block;
+
+        public DelegateHeatBehavior(IDictionary<string, object> logic, IMyCubeBlock block = null)
         {
             _logic = logic;
+            _block = block;
         }
 
         public float GetHeatChange(float deltaTime)

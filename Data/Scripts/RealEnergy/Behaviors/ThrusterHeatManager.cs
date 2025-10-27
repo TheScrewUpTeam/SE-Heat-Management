@@ -44,6 +44,8 @@ namespace TSUT.HeatManagement
         private IGridHeatManager _gridManager;
         private IMyThrust _thruster;
 
+        public override IMyCubeBlock Block => _thruster;
+
         public ThrusterHeatManager(IMyThrust thruster, IGridHeatManager manager)
         {
             _thruster = thruster;

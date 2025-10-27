@@ -16,6 +16,7 @@ namespace TSUT.HeatManagement
         void UpdateNeighborsTemp(float deltaTime);
         void UpdateVisuals(float deltaTime);
         List<HeatPipeManager> GetHeatPipeManagers();
+        List<T> GetSpecificManagers<T>();
         void SetShowDebug(bool flag);
         bool GetShowDebug();
         bool TryReactOnHeat(IMyCubeBlock block, float heat);
@@ -29,6 +30,7 @@ namespace TSUT.HeatManagement
         void SpreadHeat(float deltaTime);
         void Cleanup();
         void ReactOnNewHeat(float heat);
+        IMyCubeBlock Block { get; }
     }
 
     public interface IMultiBlockHeatBehavior : IHeatBehavior
@@ -79,7 +81,7 @@ namespace TSUT.HeatManagement
         void SetHeat(IMyCubeBlock block, float heat, bool silent = false);
         float ApplyHeatChange(IMyCubeBlock block, float heatChange, bool silent = false);
         float GetBlockWindSpeed(IMyCubeBlock block);
-        float GetExchangeWithNeighbor(IMyCubeBlock block, IMyCubeBlock neighbor, float deltaTime);
+        float GetExchangeWithNeighbor(IMyCubeBlock block, IMyCubeBlock neighbor, float deltaTime, float conductivity = -1f);
         float GetAirDensity(IMyCubeBlock block);
         float GetActiveExhaustHeatLoss(IMyExhaustBlock exhaust, float deltaTime);
         float GetExchangeWithNetwork(IMyCubeBlock block, IMyCubeBlock networkBlock, float deltaTime);
@@ -135,5 +137,10 @@ namespace TSUT.HeatManagement
         float HEATPIPE_CONDUCTIVITY { get; set; }
         float EXHAUST_HEAT_REJECTION_RATE { get; set; }
         bool HEAT_GLOW_INDICATION { get; set; }
+    }
+
+    public interface IDirectHeatAcceptor
+    {
+        void ApplyHeatChange(float heatChange);
     }
 }

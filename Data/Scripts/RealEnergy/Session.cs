@@ -55,6 +55,8 @@ namespace TSUT.HeatManagement
             _heatApi.Registry.RegisterHeatBehaviorFactory(new ThrusterHeatManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new HeatPipeManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new HeatVentManagerFactory());
+            _heatApi.Registry.RegisterHeatBehaviorFactory(new RotorHeatManagerFactory());
+            _heatApi.Registry.RegisterHeatBehaviorFactory(new PistonHeatManagerFactory());
 
             MyAPIGateway.Utilities.RegisterMessageHandler(HmsApi.HeatProviderMesageId, OnHeatProviderRegister);
             var shareable = ConvertApiToShareable(_heatApi);
@@ -401,13 +403,14 @@ namespace TSUT.HeatManagement
             MyAPIGateway.TerminalControls.CustomControlGetter += OnCustomControlGetter;
         }
 
-        public static void GetGridHeatManager(IMyCubeGrid grid, out GridHeatManager manager)
+        public static bool GetGridHeatManager(IMyCubeGrid grid, out GridHeatManager manager)
         {
             if (_gridHeatManagers.TryGetValue(grid, out manager))
-                return;
+                return false;
 
             manager = new GridHeatManager(grid);
             _gridHeatManagers[grid] = manager;
+            return true;
         }
 
         public static void RebuildEverything()

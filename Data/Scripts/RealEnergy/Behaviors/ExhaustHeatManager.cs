@@ -44,6 +44,8 @@ namespace TSUT.HeatManagement
         private IGridHeatManager _gridManager;
         private IMyExhaustBlock _exhaust;
 
+        public override IMyCubeBlock Block => _exhaust;
+
         public ExhaustHeatManager(IMyExhaustBlock exhaust, IGridHeatManager manager)
         {
             _exhaust = exhaust;
