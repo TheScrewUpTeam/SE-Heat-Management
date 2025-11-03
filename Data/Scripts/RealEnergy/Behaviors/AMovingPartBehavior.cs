@@ -21,9 +21,24 @@ namespace TSUT.HeatManagement
 
         private void GetCustomInfo(IMyTerminalBlock block, StringBuilder builder)
         {
-            builder.AppendLine($"--- Heat Management ---");
+            float ownThermalCapacity = HeatSession.Api.Utils.GetThermalCapacity(block);
+            
             float heat = HeatSession.Api.Utils.GetHeat(_part);
+            var neighborStringBuilder = new StringBuilder();
+            float neighborCum;
+            float networkCum;
+            AddNeighborAndNetworksInfo(_part, neighborStringBuilder, out neighborCum, out networkCum);
+            float heatChange = GetHeatChange(1f) - neighborCum - networkCum; // Assuming deltaTime of 1 second for display purposes
+
+            builder.AppendLine($"--- Heat Management ---");
             builder.AppendLine($"Temperature: {heat:F1} °C");
+            builder.AppendLine($"Net Heat Change: {heatChange:+0.00;-0.00;0.00} °C/s");
+            builder.AppendLine($"Thermal Capacity: {ownThermalCapacity / 1000000:F1} MJ/°C");
+            string heatStatus = heatChange > 0 ? "Heating" : heatChange < -0.01 ? "Cooling" : "Stable";
+            builder.AppendLine($"Thermal Status: {heatStatus}");
+            builder.AppendLine("");
+            builder.AppendLine("Heat Sources:");
+            builder.Append(neighborStringBuilder);
         }
 
         public override void Cleanup()
@@ -43,12 +58,22 @@ namespace TSUT.HeatManagement
             var counterpartyBehavior = GetCounterpartyHeatManager();
             if (counterpartyBehavior != null)
             {
-                var exchangeResult = HeatSession.Api.Utils.GetExchangeWithNeighbor(_part, counterpartyBehavior.Block, deltaTime);
+                var energyTransferred = HeatSession.Api.Utils.GetExchangeWithNeighbor(_part, counterpartyBehavior.Block, deltaTime, HeatConductivity);
+
+                var capacityOwn = HeatSession.Api.Utils.GetThermalCapacity(_part);
+                var counterCapacity = HeatSession.Api.Utils.GetThermalCapacity(counterpartyBehavior.Block);
+                var tempDiff = HeatSession.Api.Utils.GetHeat(_part) - HeatSession.Api.Utils.GetHeat(counterpartyBehavior.Block);
+
+                energyTransferred = HeatSession.Api.Utils.ApplyExchangeLimit(energyTransferred, capacityOwn, counterCapacity, tempDiff);
+                
+                float deltaOwn = energyTransferred / capacityOwn;
+                float deltaNeighbor = energyTransferred / counterCapacity;
+
                 if (counterpartyBehavior is IDirectHeatAcceptor)
                 {
-                    (counterpartyBehavior as IDirectHeatAcceptor).ApplyHeatChange(-exchangeResult);
+                    (counterpartyBehavior as IDirectHeatAcceptor).ApplyHeatChange(-deltaNeighbor);
                 }
-                return exchangeResult;
+                return deltaOwn;
             }
             return 0f;
         }

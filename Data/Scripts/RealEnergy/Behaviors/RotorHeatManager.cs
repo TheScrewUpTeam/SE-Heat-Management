@@ -31,39 +31,26 @@ namespace TSUT.HeatManagement
 
         public HeatBehaviorAttachResult OnBlockAdded(IMyCubeBlock block, IGridHeatManager manager)
         {
-            // MyLog.Default.WriteLineAndConsole($"[HeatManagement,Motors] OnBlockAdded called for block {block.DisplayNameText} on {block.CubeGrid.DisplayName}");
             var result = new HeatBehaviorAttachResult();
-            var existing = manager.TryGetHeatBehaviour(block);
+            var existing = HeatSession.GetBehaviorForBlock(block);
             if (existing != null)
                 return result;
-
-            // MyLog.Default.WriteLineAndConsole($"[HeatManagement,Motors] => Current grid: no existing behavior");
 
             GridHeatManager oppositeGrid = null;
             if (block is IMyMotorStator && (block as IMyMotorStator).Top != null)
             {
-                // MyLog.Default.WriteLineAndConsole($"[HeatManagement,Motors] => It's stator");
                 var grid = (block as IMyMotorStator).Top.CubeGrid;
-                // MyLog.Default.WriteLineAndConsole($"[HeatManagement,Motors] => Grid defined {grid.DisplayName}");
                 HeatSession.GetGridHeatManager(grid, out oppositeGrid);
-                // MyLog.Default.WriteLineAndConsole($"[HeatManagement,Motors] => Behavior found");
             }
             else if (block is IMyMotorRotor && (block as IMyMotorRotor).Base != null)
             {
-                // MyLog.Default.WriteLineAndConsole($"[HeatManagement,Motors] => It's rotor");
                 var grid = (block as IMyMotorRotor).Base.CubeGrid;
-                // MyLog.Default.WriteLineAndConsole($"[HeatManagement,Motors] => Grid defined {grid.DisplayName}");
                 HeatSession.GetGridHeatManager(grid, out oppositeGrid);
-                // MyLog.Default.WriteLineAndConsole($"[HeatManagement,Motors] => Behavior found");
             }
-            if (oppositeGrid != null) 
-                // MyLog.Default.WriteLineAndConsole($"[HeatManagement,Motors] => Opposite grid found");
             if (oppositeGrid != null && oppositeGrid.TryGetHeatBehaviour(block) != null)
             {
                 return result;
             }
-
-            // MyLog.Default.WriteLineAndConsole($"[HeatManagement,Motors] => No existing behavior");
 
             if (block is IMyMotorStator)
             {
@@ -71,7 +58,6 @@ namespace TSUT.HeatManagement
                 var behavior = new MotorStatorHeatManager(stator);
                 result.Behavior = behavior;
                 result.AffectedBlocks = new List<IMyCubeBlock> { block };
-                // MyLog.Default.WriteLineAndConsole($"[HeatManagement,Stator] => Block added");
             }
             else if (block is IMyMotorRotor)
             {
@@ -79,7 +65,6 @@ namespace TSUT.HeatManagement
                 var behavior = new MotorRotorHeatManager(rotor);
                 result.Behavior = behavior;
                 result.AffectedBlocks = new List<IMyCubeBlock> { block };
-                // MyLog.Default.WriteLineAndConsole($"[HeatManagement,Rotor] => Block added");
             }
             return result;
         }

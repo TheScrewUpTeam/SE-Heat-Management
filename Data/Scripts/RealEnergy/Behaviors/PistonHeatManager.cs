@@ -31,7 +31,7 @@ namespace TSUT.HeatManagement
         public HeatBehaviorAttachResult OnBlockAdded(IMyCubeBlock block, IGridHeatManager manager)
         {
             var result = new HeatBehaviorAttachResult();
-            var existing = manager.TryGetHeatBehaviour(block);
+            var existing = HeatSession.GetBehaviorForBlock(block);
             if (existing != null)
                 return result;
 
