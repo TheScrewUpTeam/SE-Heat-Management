@@ -135,7 +135,6 @@ namespace TSUT.HeatManagement
                         {
                             _heatBehaviors[affected] = result.Behavior;
                         }
-                        // MyLog.Default.WriteLineAndConsole($"[HeatManagement] Result processed, {_heatBehaviors.Count} on grid");
                     }
                 }
                 catch (Exception ex)
@@ -168,6 +167,23 @@ namespace TSUT.HeatManagement
                 }
             }
             HeatSession.Api.Utils.PurgeCaches();
+        }
+
+        public void DropAll()
+        {
+            var blocks = _grid.GetFatBlocks<IMyCubeBlock>();
+            foreach (var block in blocks)
+            {
+                HeatSession.Api.Utils.DropTemperature(block);
+            }
+            lock (_heatBehaviors)
+            {
+                foreach (var kvp in _heatBehaviors)
+                {
+                    var temp = HeatSession.Api.Utils.GetHeat(kvp.Key);
+                    kvp.Value.ReactOnNewHeat(temp);
+                }
+            }
         }
 
         public void UpdateBlocksTemp(float deltaTime)
@@ -263,6 +279,7 @@ namespace TSUT.HeatManagement
                 try
                 {
                     behavior.SpreadHeat(neighborsTimeAccumulator);
+                    behavior.ReactOnNewHeat(HeatSession.Api.Utils.GetHeat(kvp.Key));
                 }
                 catch (Exception ex)
                 {

@@ -16,6 +16,8 @@ namespace TSUT.HeatManagement
             if (_part is IMyTerminalBlock && !SkipCustomInfoRegistration)
             {
                 (_part as IMyTerminalBlock).AppendingCustomInfo += GetCustomInfo;
+                (_part as IMyTerminalBlock).SetDetailedInfoDirty();
+                (_part as IMyTerminalBlock).RefreshCustomInfo();
             }
         }
 
@@ -28,7 +30,7 @@ namespace TSUT.HeatManagement
             float neighborCum;
             float networkCum;
             AddNeighborAndNetworksInfo(_part, neighborStringBuilder, out neighborCum, out networkCum);
-            float heatChange = GetHeatChange(1f) - neighborCum - networkCum; // Assuming deltaTime of 1 second for display purposes
+            float heatChange = CalculateHeatChange(1f, false) - neighborCum - networkCum; // Assuming deltaTime of 1 second for display purposes
 
             builder.AppendLine($"--- Heat Management ---");
             builder.AppendLine($"Temperature: {heat:F1} °C");
@@ -38,6 +40,7 @@ namespace TSUT.HeatManagement
             builder.AppendLine($"Thermal Status: {heatStatus}");
             builder.AppendLine("");
             builder.AppendLine("Heat Sources:");
+            builder.AppendLine($"  Connected grid: {CalculateHeatChange(1f, false):F1} °C");
             builder.Append(neighborStringBuilder);
         }
 
@@ -48,13 +51,8 @@ namespace TSUT.HeatManagement
             _part = default(T);
         }
 
-        public override float GetHeatChange(float deltaTime) {
-            if (_lastHeatChange != 0f)
-            {
-                var temp = _lastHeatChange;
-                _lastHeatChange = 0f;
-                return temp;
-            }
+        public float CalculateHeatChange(float deltaTime, bool save = true)
+        {
             var counterpartyBehavior = GetCounterpartyHeatManager();
             if (counterpartyBehavior != null)
             {
@@ -65,22 +63,40 @@ namespace TSUT.HeatManagement
                 var tempDiff = HeatSession.Api.Utils.GetHeat(_part) - HeatSession.Api.Utils.GetHeat(counterpartyBehavior.Block);
 
                 energyTransferred = HeatSession.Api.Utils.ApplyExchangeLimit(energyTransferred, capacityOwn, counterCapacity, tempDiff);
-                
+
                 float deltaOwn = energyTransferred / capacityOwn;
                 float deltaNeighbor = energyTransferred / counterCapacity;
 
-                if (counterpartyBehavior is IDirectHeatAcceptor)
+                if (counterpartyBehavior is IDirectHeatAcceptor && save)
                 {
-                    (counterpartyBehavior as IDirectHeatAcceptor).ApplyHeatChange(-deltaNeighbor);
+                    (counterpartyBehavior as IDirectHeatAcceptor).ApplyHeatChange(deltaNeighbor);
                 }
-                return deltaOwn;
+                return -deltaOwn;
             }
             return 0f;
+        }
+
+        public override float GetHeatChange(float deltaTime)
+        {
+            if (_lastHeatChange != 0f)
+            {
+                var temp = _lastHeatChange;
+                _lastHeatChange = 0f;
+                return temp;
+            }
+
+            return CalculateHeatChange(deltaTime);
         }
 
         public override void ReactOnNewHeat(float heat)
         {
             HeatSession.Api.Effects.UpdateBlockHeatLight(_part, HeatSession.Api.Utils.GetHeat(_part));
+            if (_part is IMyTerminalBlock)
+            {
+                var terminalBlock = Block as IMyTerminalBlock;
+                terminalBlock.SetDetailedInfoDirty();
+                terminalBlock.RefreshCustomInfo();
+            }
         }
 
         public override void SpreadHeat(float deltaTime)

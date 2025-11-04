@@ -70,6 +70,7 @@ namespace TSUT.HeatManagement
         float GetAmbientHeatLoss(IMyCubeBlock block, float deltaTime);
         float GetDensity(IMyCubeBlock block);
         float GetHeat(IMyCubeBlock block);
+        void DropTemperature(IMyCubeBlock block);
         float GetLargestFaceArea(IMySlimBlock block);
         float GetMass(IMyCubeBlock block);
         float GetRealSurfaceArea(IMyCubeBlock battery);

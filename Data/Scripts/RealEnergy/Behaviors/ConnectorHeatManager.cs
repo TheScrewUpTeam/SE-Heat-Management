@@ -52,6 +52,7 @@ namespace TSUT.HeatManagement
         {
             _block = block;
             _block.AppendingCustomInfo += GetCustomInfo;
+            _block.SetDetailedInfoDirty();
         }
 
         public override void Cleanup()
@@ -63,13 +64,14 @@ namespace TSUT.HeatManagement
         private void GetCustomInfo(IMyTerminalBlock block, StringBuilder builder)
         {
             float ownThermalCapacity = HeatSession.Api.Utils.GetThermalCapacity(block);
-            
+
             float heat = HeatSession.Api.Utils.GetHeat(_block);
             var neighborStringBuilder = new StringBuilder();
+            var ownChange = CalculateHeatChange(1f, false);
             float neighborCum;
             float networkCum;
             AddNeighborAndNetworksInfo(_block, neighborStringBuilder, out neighborCum, out networkCum);
-            float heatChange = GetHeatChange(1f) - neighborCum - networkCum; // Assuming deltaTime of 1 second for display purposes
+            float heatChange = ownChange - neighborCum - networkCum; // Assuming deltaTime of 1 second for display purposes
 
             builder.AppendLine($"--- Heat Management ---");
             builder.AppendLine($"Temperature: {heat:F1} °C");
@@ -79,19 +81,14 @@ namespace TSUT.HeatManagement
             builder.AppendLine($"Thermal Status: {heatStatus}");
             builder.AppendLine("");
             builder.AppendLine("Heat Sources:");
+            builder.AppendLine($"  Connected grid: {ownChange:+0.00;-0.00;0.00} °C/s");
             builder.Append(neighborStringBuilder);
         }
-
-        public override float GetHeatChange(float deltaTime)
+        
+        public float CalculateHeatChange(float deltaTime, bool save = true)
         {
-            if (_hasCachedValue)
-            {
-                _hasCachedValue = false;
-                return _cachedTempChange;
-            }
             if (!_block.IsConnected)
                 return 0f;
-
             var counterConnector = _block.OtherConnector;
             var counterManager = HeatSession.GetBehaviorForBlock(counterConnector);
             var energyTransferred = HeatSession.Api.Utils.GetExchangeWithNeighbor(_block, counterConnector, deltaTime, Config.Instance.HEATPIPE_CONDUCTIVITY);
@@ -105,17 +102,30 @@ namespace TSUT.HeatManagement
             float deltaOwn = energyTransferred / capacityOwn;
             float deltaNeighbor = energyTransferred / counterCapacity;
 
-            if (counterManager is ConnectorHeatManager)
+            if (counterManager is ConnectorHeatManager && save)
             {
-                (counterManager as ConnectorHeatManager).ApplyHeatDirectly(-deltaNeighbor);
+                (counterManager as ConnectorHeatManager).ApplyHeatDirectly(deltaNeighbor);
             }
 
-            return deltaOwn;
+            return -deltaOwn;
+        }
+
+        public override float GetHeatChange(float deltaTime)
+        {
+            if (_hasCachedValue)
+            {
+                _hasCachedValue = false;
+                return _cachedTempChange;
+            }
+
+            return CalculateHeatChange(deltaTime);
         }
 
         public override void ReactOnNewHeat(float heat)
         {
             HeatSession.Api.Effects.UpdateBlockHeatLight(_block, HeatSession.Api.Utils.GetHeat(_block));
+            _block.SetDetailedInfoDirty();
+            _block.RefreshCustomInfo();
         }
 
         public override void SpreadHeat(float deltaTime)

@@ -94,6 +94,11 @@ namespace TSUT.HeatManagement
             }
         }
 
+        public void DropTemperature(IMyCubeBlock block)
+        {
+            SetHeat(block, CalculateAmbientTemperature(block));
+        }
+
         public float GetRealSurfaceArea(IMyCubeBlock battery)
         {
             if (battery == null || battery.CubeGrid == null)

@@ -525,7 +525,6 @@ namespace TSUT.HeatManagement
         private float _accumulatedTime = 0;
         
         // Cache for batch processing
-        private Dictionary<IMyCubeBlock, float> _heatCache;
         private Dictionary<IMyCubeBlock, float> _capacityCache;
         private Dictionary<IMyCubeBlock, float> _deltaHeat;
 
@@ -703,14 +702,12 @@ namespace TSUT.HeatManagement
 
         private void InitializeCaches()
         {
-            if (_heatCache == null)
+            if (_deltaHeat == null)
             {
-                _heatCache = new Dictionary<IMyCubeBlock, float>(_nodes.Count);
                 _capacityCache = new Dictionary<IMyCubeBlock, float>(_nodes.Count);
                 _deltaHeat = new Dictionary<IMyCubeBlock, float>(_nodes.Count);
             }
-            
-            _heatCache.Clear();
+
             _deltaHeat.Clear();
         }
 
@@ -721,7 +718,6 @@ namespace TSUT.HeatManagement
             // Pre-cache values for all nodes in the network
             foreach (var node in _nodes)
             {
-                _heatCache[node.Block] = HeatSession.Api.Utils.GetHeat(node.Block);
                 if (!_capacityCache.ContainsKey(node.Block))
                     _capacityCache[node.Block] = HeatSession.Api.Utils.GetThermalCapacity(node.Block);
                 _deltaHeat[node.Block] = 0f;
@@ -736,8 +732,8 @@ namespace TSUT.HeatManagement
                     if (edge.A != node)
                         continue;
 
-                    float tempA = _heatCache[edge.A.Block];
-                    float tempB = _heatCache[edge.B.Block];
+                    float tempA = HeatSession.Api.Utils.GetHeat(edge.A.Block);
+                    float tempB = HeatSession.Api.Utils.GetHeat(edge.B.Block);
                     float tempDiff = tempB - tempA;
 
                     // Skip negligible temperature differences
@@ -762,10 +758,6 @@ namespace TSUT.HeatManagement
                     // Accumulate changes
                     _deltaHeat[edge.A.Block] += energyDelta / capA;
                     _deltaHeat[edge.B.Block] -= energyDelta / capB;
-
-                    // Update cached temperatures for next iteration
-                    _heatCache[edge.A.Block] += energyDelta / capA;
-                    _heatCache[edge.B.Block] -= energyDelta / capB;
                 }
             }
         }
@@ -799,8 +791,8 @@ namespace TSUT.HeatManagement
             }
 
             // Process segment using accumulated time
-                ProcessSegment(segmentNodes, _accumulatedTime);
-            
+            ProcessSegment(segmentNodes, _accumulatedTime);
+
             // Apply heat changes
             foreach (var kvp in _deltaHeat)
             {
@@ -809,6 +801,7 @@ namespace TSUT.HeatManagement
                     HeatSession.Api.Utils.ApplyHeatChange(kvp.Key, kvp.Value);
                 }
             }
+            _deltaHeat.Clear();
 
             // Clear accumulated time and dirty flag when we finish all segments
             bool isLastSegment = _currentSegment >= totalSegments - 1;
@@ -822,22 +815,6 @@ namespace TSUT.HeatManagement
             {
                 _currentSegment++;
             }
-        }
-
-        private void NotifyClients(List<HeatValuePair> heatChanges)
-        {
-            if (_lastNetworkBroadcastTick + NETWORK_BROADCAST_INTERVAL > HeatSession._tickCount)
-                return;
-
-            var grid = _nodes.First().Block.CubeGrid;
-
-            var msg = new HeatNetworkSyncMessage
-            {
-                GridId = grid.EntityId,
-                Heats = heatChanges
-            };
-            HeatSession.networking.RelayToGridOwners(msg, grid);
-            _lastNetworkBroadcastTick = HeatSession._tickCount;
         }
 
         public void Cleanup() => _nodes = null;

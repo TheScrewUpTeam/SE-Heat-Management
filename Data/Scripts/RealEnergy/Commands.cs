@@ -33,9 +33,16 @@ namespace TSUT.HeatManagement
                 sendToOthers = false; // Prevent the message from being sent to other players
                 return;
             }
+            if (messageText.Equals("/HMS.dropTemps", StringComparison.OrdinalIgnoreCase))
+            {
+                HeatSession.DropAllTemperatures();
+                MyAPIGateway.Utilities.ShowMessage("HeatManagement", "All temperatures dropped to initial.");
+                sendToOthers = false; // Prevent the message from being sent to other players
+                return;
+            }
             sendToOthers = true; // Allow other messages to be sent to other players
         }
-        
+
         public void Unload()
         {
             MyAPIGateway.Utilities.MessageEntered -= OnMessageEntered;

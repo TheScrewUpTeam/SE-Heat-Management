@@ -85,11 +85,7 @@ namespace TSUT.HeatManagement
             var top = _part.Top as IMyMotorRotor;
             if (top != null)
             {
-                GridHeatManager gridManager;
-                if (HeatSession.GetGridHeatManager(top.CubeGrid, out gridManager))
-                {
-                    return gridManager.TryGetHeatBehaviour(_part);
-                }
+                return HeatSession.GetBehaviorForBlock(top);
             }
             return null;
         }
@@ -110,11 +106,7 @@ namespace TSUT.HeatManagement
             var basePart = _part.Base as IMyMotorStator;
             if (basePart != null)
             {
-                GridHeatManager gridManager;
-                if (HeatSession.GetGridHeatManager(basePart.CubeGrid, out gridManager))
-                {
-                    return gridManager.TryGetHeatBehaviour(_part);
-                }
+                return HeatSession.GetBehaviorForBlock(basePart);
             }
             return null;
         }

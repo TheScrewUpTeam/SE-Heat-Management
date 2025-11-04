@@ -139,7 +139,7 @@ namespace TSUT.HeatManagement
             {
                 manager.Cleanup();
                 _gridHeatManagers.Remove(grid);
-                MyLog.Default.WriteLine($"[HeatManagement] Grid added. Total grids with heat management: {_gridHeatManagers.Count}");
+                MyLog.Default.WriteLine($"[HeatManagement] Grid removed. Total grids with heat management: {_gridHeatManagers.Count}");
             }
             if (_ownershipSubscribedGrids.Contains(grid))
             {
@@ -438,6 +438,17 @@ namespace TSUT.HeatManagement
             foreach (var entity in allEntities)
             {
                 Instance.OnEntityAdd(entity);
+            }
+        }
+
+        public static void DropAllTemperatures()
+        {
+            lock (_gridHeatManagers)
+            {
+                foreach (var manager in _gridHeatManagers.Values)
+                {
+                    manager.DropAll();
+                }
             }
         }
 
