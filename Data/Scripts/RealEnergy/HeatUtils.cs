@@ -86,7 +86,9 @@ namespace TSUT.HeatManagement
             if (float.IsNaN(heat) || float.IsInfinity(heat))
             {
                 MyAPIGateway.Utilities.ShowNotification($"Wrong heat value for {block.DisplayNameText}: {heat}", 1000);
+                return;
             }
+            heat = Math.Max(heat, Config.ABSOLUTE_ZERO_CELSIUS);
             block.Storage[HeatKey] = heat.ToString();
             if (!silent)
             {
@@ -308,6 +310,8 @@ namespace TSUT.HeatManagement
 
         public float GetThermalCapacity(IMyCubeBlock block)
         {
+            if (block == null)
+                return 0f;
             if (_cacheTermalCapacity.ContainsKey(block.DisplayNameText))
             {
                 return _cacheTermalCapacity[block.DisplayNameText];

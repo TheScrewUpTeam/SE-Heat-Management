@@ -107,6 +107,7 @@ namespace TSUT.HeatManagement
             _commandsInstance?.Unload();
             networking?.Unregister();
             MyAPIGateway.Utilities.UnregisterMessageHandler(HmsApi.HeatProviderMesageId, OnHeatProviderRegister);
+            MyAPIGateway.TerminalControls.CustomControlGetter -= OnCustomControlGetter;
         }
 
         public override void BeforeStart()
@@ -115,7 +116,7 @@ namespace TSUT.HeatManagement
             MyAPIGateway.Utilities.SendModMessage(HmsApi.HeatApiMessageId, shareable);
             MyLog.Default.WriteLine($"[HeatManagement] HeatAPI populated late");
             networking.Register();
-            RegisterDebugControl();
+            RegisterCustomControls();
 
             HashSet<IMyEntity> allEntities = new HashSet<IMyEntity>();
             MyAPIGateway.Entities.GetEntities(allEntities);
@@ -394,16 +395,6 @@ namespace TSUT.HeatManagement
             }
         }
 
-        public static void RegisterDebugControl()
-        {
-            if (_initialized)
-                return;
-
-            _initialized = true;
-
-            MyAPIGateway.TerminalControls.CustomControlGetter += OnCustomControlGetter;
-        }
-
         public static bool GetGridHeatManager(IMyCubeGrid grid, out GridHeatManager manager)
         {
             if (_gridHeatManagers.TryGetValue(grid, out manager))
@@ -459,6 +450,17 @@ namespace TSUT.HeatManagement
 
             // wheel grids have exactly one block and it's a wheel part
             return slimBlocks.Count == 1 && slimBlocks[0].FatBlock is IMyWheel;
+        }
+
+        public static void RegisterCustomControls()
+        {
+            VentHeatManager.RegisterCustomActions();
+            if (_initialized)
+                return;
+
+            _initialized = true;
+
+            MyAPIGateway.TerminalControls.CustomControlGetter += OnCustomControlGetter;
         }
 
         private static void OnCustomControlGetter(IMyTerminalBlock block, List<IMyTerminalControl> controls)
