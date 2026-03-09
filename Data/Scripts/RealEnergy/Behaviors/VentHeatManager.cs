@@ -124,7 +124,7 @@ namespace TSUT.HeatManagement
             if (_controlsInitialized)
                 return;
 
-            MyAPIGateway.Utilities.ShowMessage("HeatManagement", $"RegisterCustomActions called");
+            // MyAPIGateway.Utilities.ShowMessage("HeatManagement", $"RegisterCustomActions called");
 
             var turboSelectorIncr = MyAPIGateway.TerminalControls.CreateAction<IMyAirVent>("O2TurboIncrease");
             turboSelectorIncr.Name = new StringBuilder("Increase O2 Usage For Cooling");

@@ -146,7 +146,38 @@ public class MyCustomHeatBehavior : HmsApi.AHeatBehavior
 
 ---
 
-## 7. License
+## 7. Terminal Property Integration
+
+### Heat Temperature Display
+
+HMS automatically adds a read-only "Heat Temperature" property to all terminal blocks in the control panel. This property displays the current heat value of any block using the HMS system.
+
+**Features:**
+
+- Displays current heat value in degrees Celsius
+- Updates in real-time as block temperatures change
+- Read-only (cannot be modified by players)
+- Visible for all blocks with heat management enabled
+- Available in both single-player and multiplayer
+
+**Accessing the Property:**
+
+The Heat Temperature property is accessible programmatically via in-game scripts using the `GetValue<T>()` method:
+
+```csharp
+public void Main(string argument, UpdateType updateSource)
+{
+    var battery = GridTerminalSystem.GetBlockWithName("Test Battery");
+    float temp = battery.GetValue<float>("HeatTemperature");
+    Echo($"Temperature: {temp}");
+}
+```
+
+This allows you to read the current heat value from any terminal block in your programmable block scripts.
+
+---
+
+## 8. License
 
 See `LICENSE.txt` for usage terms.
 

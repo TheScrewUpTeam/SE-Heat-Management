@@ -41,6 +41,7 @@ namespace TSUT.HeatManagement
 
         private HeatCommands _commandsInstance;
         public static HeatSession Instance { get; private set; }
+        static bool temperaturePropertyCreated = false;
 
         public override void LoadData()
         {
@@ -64,6 +65,30 @@ namespace TSUT.HeatManagement
             MyAPIGateway.Utilities.SendModMessage(HmsApi.HeatApiMessageId, shareable);
             MyLog.Default.WriteLine($"[HeatManagement] HeatAPI populated");
             _commandsInstance = HeatCommands.Instance; // Initialize commands
+            AddTemperaturePropertyControl();
+        }
+
+        private static void AddTemperaturePropertyControl()
+        {
+            if (MyAPIGateway.Utilities.IsDedicated)
+            return;
+
+            if (temperaturePropertyCreated)
+                return;
+
+            temperaturePropertyCreated = true;
+
+            var property =
+                MyAPIGateway.TerminalControls.CreateProperty<float, IMyTerminalBlock>("HeatTemperature");
+
+            property.Getter = (b) =>
+            {
+                return _heatApi.Utils.GetHeat(b);
+            };
+
+            property.Setter = (b, v) => { }; // read-only
+
+            MyAPIGateway.TerminalControls.AddControl<IMyTerminalBlock>(property);
         }
 
         private void OnHeatProviderRegister(object obj)
@@ -107,7 +132,7 @@ namespace TSUT.HeatManagement
             _commandsInstance?.Unload();
             networking?.Unregister();
             MyAPIGateway.Utilities.UnregisterMessageHandler(HmsApi.HeatProviderMesageId, OnHeatProviderRegister);
-            MyAPIGateway.TerminalControls.CustomControlGetter -= OnCustomControlGetter;
+            MyAPIGateway.TerminalControls.CustomControlGetter -= AddShowNetworksControl;
         }
 
         public override void BeforeStart()
@@ -460,10 +485,11 @@ namespace TSUT.HeatManagement
 
             _initialized = true;
 
-            MyAPIGateway.TerminalControls.CustomControlGetter += OnCustomControlGetter;
+            MyAPIGateway.TerminalControls.CustomControlGetter += AddShowNetworksControl;
+            // MyAPIGateway.TerminalControls.CustomControlGetter += AddTemperaturePropertyControl;
         }
 
-        private static void OnCustomControlGetter(IMyTerminalBlock block, List<IMyTerminalControl> controls)
+        private static void AddShowNetworksControl(IMyTerminalBlock block, List<IMyTerminalControl> controls)
         {
             if (!(block is IMyBatteryBlock))
                 return;
