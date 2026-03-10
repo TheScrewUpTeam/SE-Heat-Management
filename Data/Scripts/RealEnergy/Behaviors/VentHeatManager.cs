@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Text;
+using Sandbox.Game.EntityComponents;
 using Sandbox.ModAPI;
 using Sandbox.ModAPI.Interfaces.Terminal;
 using SpaceEngineers.Game.ModAPI;
@@ -41,7 +42,7 @@ namespace TSUT.HeatManagement
         public int Priority => 20; // Vents are less critical than batteries
     }
 
-    public class VentHeatManager : AHeatBehavior
+    public class VentHeatManager : AHeatBehavior, IO2Consumer, IO2Producer
     {
         private static bool _controlsInitialized = false;
         private IGridHeatManager _gridManager;
@@ -281,6 +282,35 @@ namespace TSUT.HeatManagement
             _vent.RefreshCustomInfo();
             return;
         }
+
+        // IO2Consumer implementation
+        public float GetO2Consumption(float deltaTime)
+        {
+            if (_vent == null || !_vent.IsWorking || _vent.CanPressurize)
+                return 0f;
+
+            float turboO2Usage = GetO2Turbo(_vent);
+            return turboO2Usage * deltaTime;
+        }
+
+        // IO2Producer implementation
+        public float GetO2Production(float deltaTime)
+        {
+            if (_vent == null || !_vent.IsWorking || !_vent.Depressurize)
+                return 0f;
+
+            var sourceComp = _vent.Components.Get<MyResourceSourceComponent>();
+            if (sourceComp != null)
+            {
+                var resourceId = MyResourceDistributorComponent.OxygenId;
+                return sourceComp.CurrentOutputByType(resourceId) * deltaTime;
+            }
+            return 0f;
+        }
+
+        // Common interface property
+        bool IO2Consumer.IsWorking => _vent?.IsWorking ?? false;
+        bool IO2Producer.IsWorking => _vent?.IsWorking ?? false;
 
         private List<IMyGasTank> FindConnectedO2TanksThroughConveyor()
         {
