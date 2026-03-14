@@ -22,6 +22,8 @@ namespace TSUT.HeatManagement
         bool TryReactOnHeat(IMyCubeBlock block, float heat);
         int GetScaleBasedOnBlocksCount();
         int GetTicksTillNextUpdate();
+        float ConsumeO2(float amount, float deltaTime, IMyCubeBlock block);
+        bool HasEnoughO2(float amount, float deltaTime, IMyCubeBlock block);
     }
 
     public interface IHeatBehavior

@@ -43,6 +43,15 @@ namespace TSUT.HeatManagement
         public static HeatSession Instance { get; private set; }
         static bool temperaturePropertyCreated = false;
 
+        public static void AttachO2GridManager(GridO2Manager manager, IMyCubeGrid grid)
+        {
+            GridHeatManager heatManager;
+            if (!_gridHeatManagers.TryGetValue(grid, out heatManager))
+                return;
+            
+            heatManager.AttachO2Manager(manager);
+        }
+
         public override void LoadData()
         {
             // Load config (will use defaults if file doesn't exist)
@@ -59,20 +68,18 @@ namespace TSUT.HeatManagement
             _heatApi.Registry.RegisterHeatBehaviorFactory(new RotorHeatManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new PistonHeatManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new ConnectorHeatManagerFactory());
-            _heatApi.Registry.RegisterHeatBehaviorFactory(new ConveyorNetworkBehaviorFactory());
 
             MyAPIGateway.Utilities.RegisterMessageHandler(HmsApi.HeatProviderMesageId, OnHeatProviderRegister);
             var shareable = ConvertApiToShareable(_heatApi);
             MyAPIGateway.Utilities.SendModMessage(HmsApi.HeatApiMessageId, shareable);
             MyLog.Default.WriteLine($"[HeatManagement] HeatAPI populated");
             _commandsInstance = HeatCommands.Instance; // Initialize commands
-            AddTemperaturePropertyControl();
         }
 
         private static void AddTemperaturePropertyControl()
         {
             if (MyAPIGateway.Utilities.IsDedicated)
-            return;
+                return;
 
             if (temperaturePropertyCreated)
                 return;
@@ -143,6 +150,7 @@ namespace TSUT.HeatManagement
             MyLog.Default.WriteLine($"[HeatManagement] HeatAPI populated late");
             networking.Register();
             RegisterCustomControls();
+            AddTemperaturePropertyControl();
 
             HashSet<IMyEntity> allEntities = new HashSet<IMyEntity>();
             MyAPIGateway.Entities.GetEntities(allEntities);
@@ -487,7 +495,6 @@ namespace TSUT.HeatManagement
             _initialized = true;
 
             MyAPIGateway.TerminalControls.CustomControlGetter += AddShowNetworksControl;
-            // MyAPIGateway.TerminalControls.CustomControlGetter += AddTemperaturePropertyControl;
         }
 
         private static void AddShowNetworksControl(IMyTerminalBlock block, List<IMyTerminalControl> controls)
