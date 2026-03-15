@@ -48,7 +48,7 @@ namespace TSUT.HeatManagement
             GridHeatManager heatManager;
             if (!_gridHeatManagers.TryGetValue(grid, out heatManager))
                 return;
-            
+
             heatManager.AttachO2Manager(manager);
         }
 
@@ -432,7 +432,7 @@ namespace TSUT.HeatManagement
         public static bool GetGridHeatManager(IMyCubeGrid grid, out GridHeatManager manager)
         {
             if (_gridHeatManagers.TryGetValue(grid, out manager))
-                return false;
+                return true;
 
             manager = new GridHeatManager(grid);
             _gridHeatManagers[grid] = manager;
@@ -618,6 +618,22 @@ namespace TSUT.HeatManagement
                             MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock,
                             MyAPIGateway.Entities.GetEntityById(neighborBlockId) as IMyCubeBlock,
                             dt))
+                },
+                {
+                    "ConsumeO2", new Func<float, float, long, float>((amount, deltaTime, blockId) =>
+                        heatApi.Utils.ConsumeO2(
+                            amount,
+                            deltaTime,
+                            MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock
+                            ))
+                },
+                {
+                    "HasEnoughO2", new Func<float, float, long, bool>((amount, deltaTime, blockId) =>
+                        heatApi.Utils.HasEnoughO2(
+                            amount,
+                            deltaTime,
+                            MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock
+                            ))
                 },
                 {
                     "GetHmsConfig", new Func<object>(() =>

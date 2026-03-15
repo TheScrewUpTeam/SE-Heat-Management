@@ -91,6 +91,8 @@ namespace TSUT.HeatManagement
         float GetExchangeUniversal(IMyCubeBlock block, IMyCubeBlock neighborBlock, float deltaTime);
         float GetHeatToDissipate(IMyCubeBlock block, float deltaTime);
         float ApplyExchangeLimit(float energyDelta, float capA, float capB, float tempDiff);
+        float ConsumeO2(float amount, float deltaTime, IMyCubeBlock block);
+        bool HasEnoughO2(float amount, float deltaTime, IMyCubeBlock block);
     }
 
     public interface IHeatEffects
