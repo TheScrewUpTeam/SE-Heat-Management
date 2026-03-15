@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.Runtime.Serialization.Formatters;
 using System.Text;
+using Sandbox.Game;
 using Sandbox.Game.EntityComponents;
 using Sandbox.ModAPI;
 using Sandbox.ModAPI.Interfaces.Terminal;
@@ -44,6 +46,7 @@ namespace TSUT.HeatManagement
 
     public class VentHeatManager : AHeatBehavior
     {
+        private static bool _controlsInitialized = false;
         private IGridHeatManager _gridManager;
         private IMyAirVent _vent;
 
@@ -82,15 +85,20 @@ namespace TSUT.HeatManagement
             return 0f;
         }
 
+        private static float GetO2TurboMax(IMyTerminalBlock block)
+        {
+            return block.CubeGrid.GridSizeEnum == MyCubeSize.Large ? 500f : 50f;
+        }
+
         private void OnCustomControlGetter(IMyTerminalBlock block, List<IMyTerminalControl> controls)
         {
             if (block != _vent)
                 return;
 
-            var slider = MyAPIGateway.TerminalControls.CreateControl<IMyTerminalControlSlider, IMyAirVent>("ShowHeatNetworks");
+            var slider = MyAPIGateway.TerminalControls.CreateControl<IMyTerminalControlSlider, IMyAirVent>("O2Turbo");
             slider.Title = MyStringId.GetOrCompute("Turbo mode");
             slider.Tooltip = MyStringId.GetOrCompute("Select O2 usage for cooling");
-            slider.SetLimits(0, _vent.CubeGrid.GridSizeEnum == MyCubeSize.Large ? 500 : 50);
+            slider.SetLimits(0, GetO2TurboMax(block));
             slider.SupportsMultipleBlocks = false;
             slider.Enabled = b => !(b as IMyAirVent).CanPressurize;
             slider.Writer = (b, sb) =>
@@ -114,6 +122,59 @@ namespace TSUT.HeatManagement
             controls.Add(slider);
         }
 
+        public static void RegisterCustomActions()
+        {
+            if (_controlsInitialized)
+                return;
+
+            // MyAPIGateway.Utilities.ShowMessage("HeatManagement", $"RegisterCustomActions called");
+
+            var turboSelectorIncr = MyAPIGateway.TerminalControls.CreateAction<IMyAirVent>("O2TurboIncrease");
+            turboSelectorIncr.Name = new StringBuilder("Increase O2 Usage For Cooling");
+            turboSelectorIncr.Enabled = b => !(b as IMyAirVent).CanPressurize;
+            turboSelectorIncr.Icon = @"Textures\GUI\Icons\Actions\Increase.dds";
+            turboSelectorIncr.Action = b =>
+            {
+                var limit = GetO2TurboMax(b);
+                float current = GetO2Turbo(b);
+                float step = limit / 10f;
+                float newValue = current + step;
+                if (newValue > limit)
+                {
+                    newValue = limit;
+                }
+                SetO2Turbo(b, newValue);
+            };
+            turboSelectorIncr.Writer = (b, sb) =>
+            {
+                sb.Append($"{GetO2Turbo(b):F2}L/s");
+            };
+            MyAPIGateway.TerminalControls.AddAction<IMyAirVent>(turboSelectorIncr);
+            
+            var turboSelectorDecr = MyAPIGateway.TerminalControls.CreateAction<IMyAirVent>("O2TurboDecrease");
+            turboSelectorDecr.Name = new StringBuilder("Decrease O2 Usage For Cooling");
+            turboSelectorDecr.Enabled = b => !(b as IMyAirVent).CanPressurize;
+            turboSelectorDecr.Icon = @"Textures\GUI\Icons\Actions\Decrease.dds";
+            turboSelectorDecr.Action = b =>
+            {
+                float current = GetO2Turbo(b);
+                float step = GetO2TurboMax(b) / 10f;
+                float newValue = current - step;
+                if (newValue < 0f)
+                {
+                    newValue = 0;
+                }
+                SetO2Turbo(b, newValue);
+            };
+            turboSelectorDecr.Writer = (b, sb) =>
+            {
+                sb.Append($"{GetO2Turbo(b):F2}L/s");
+            };
+            MyAPIGateway.TerminalControls.AddAction<IMyAirVent>(turboSelectorDecr);
+
+            _controlsInitialized = true;
+        }
+
         private void AppendVentHeatInfo(IMyTerminalBlock block, StringBuilder builder)
         {
             float ownThermalCapacity = HeatSession.Api.Utils.GetThermalCapacity(block);
@@ -126,12 +187,11 @@ namespace TSUT.HeatManagement
             var o2Exchange = 0f;
 
             var turboO2Usage = GetO2Turbo(_vent);
-            var o2Needed = turboO2Usage;
-            var o2avilable = GetO2Available();
+            var supplyGranted = _gridManager.HasEnoughO2(turboO2Usage, 1, Block);
                 
-            if (_vent.IsWorking && o2Needed <= o2avilable)
+            if (_vent.IsWorking && supplyGranted)
             {
-                o2Exchange = o2Needed * Config.Instance.VENT_TURBO_COOLING_RATE / ownThermalCapacity;
+                o2Exchange = turboO2Usage * Config.Instance.VENT_TURBO_COOLING_RATE / ownThermalCapacity;
             }
 
             float heatChange = -GetAmbientExchange(1f) - cumulativeNeighborHeatChange - cumulativeNetworkHeatChange - o2Exchange; // Assuming deltaTime of 1 second for display purposes
@@ -142,7 +202,7 @@ namespace TSUT.HeatManagement
             builder.AppendLine($"Thermal Status: {heatStatus}");
             builder.AppendLine($"Net Heat Change: {heatChange:+0.00;-0.00;0.00} °C/s");
             string exchangeMode = _vent.IsWorking
-            ? (turboO2Usage > 0 && o2Needed <= o2avilable ? "Turbo" : "Active")
+            ? (turboO2Usage > 0 && supplyGranted ? "Turbo" : "Active")
             : "Passive";
             builder.AppendLine($"Exchange Mode: {exchangeMode}");
             builder.AppendLine($"Thermal Capacity: {ownThermalCapacity / 1000000:F1} MJ/°C");
@@ -182,11 +242,11 @@ namespace TSUT.HeatManagement
             if (_vent.IsWorking && turboO2Usage > 0)
             {
                 var o2Needed = turboO2Usage;
+                var leftOvers = _gridManager.ConsumeO2(o2Needed, deltaTime, Block);
                 var o2avilable = GetO2Available();
-                if (o2Needed <= o2avilable)
+                if (leftOvers <= 0)
                 {
                     change += o2Needed * Config.Instance.VENT_TURBO_COOLING_RATE / HeatSession.Api.Utils.GetThermalCapacity(_vent);
-                    ConsumeO2(o2Needed);
                     HeatSession.Api.Effects.InstantiateSteam(_vent);
                 }
                 else
@@ -221,16 +281,44 @@ namespace TSUT.HeatManagement
         {
             HeatSession.Api.Effects.UpdateBlockHeatLight(_vent, heat);
             _vent.RefreshCustomInfo();
-            return; // Vents do not react to new heat in this implementation
+            return;
         }
 
-        private List<IMyGasTank> FindConnectedO2TanksThroughConveyor()
+        // IO2Consumer implementation
+        public float GetO2Consumption(float deltaTime)
+        {
+            if (_vent == null || !_vent.IsWorking || _vent.CanPressurize)
+                return 0f;
+
+            float turboO2Usage = GetO2Turbo(_vent);
+            return turboO2Usage * deltaTime;
+        }
+
+        // IO2Producer implementation
+        public float GetO2Production(float deltaTime)
+        {
+            if (_vent == null || !_vent.IsWorking || !_vent.Depressurize)
+                return 0f;
+
+            var sourceComp = _vent.Components.Get<MyResourceSourceComponent>();
+            if (sourceComp != null)
+            {
+                var resourceId = MyResourceDistributorComponent.OxygenId;
+                return sourceComp.CurrentOutputByType(resourceId) * deltaTime;
+            }
+            return 0f;
+        }
+
+        private List<IMyGasTank> FindConnectedO2Tanks()
         {
             var result = new List<IMyGasTank>();
             var candidates = new List<IMyGasTank>();
             MyAPIGateway.TerminalActionsHelper.GetTerminalSystemForGrid(_vent.CubeGrid).GetBlocksOfType(candidates);
             foreach (var candidate in candidates)
             {
+                if (!MyVisualScriptLogicProvider.IsConveyorConnected(Block.Name, candidate.Name))
+                    continue;
+
                 if (candidate.BlockDefinition.SubtypeName == "" || candidate.BlockDefinition.SubtypeName.Contains("Oxygen"))
                 {
                     result.Add(candidate);
@@ -243,7 +331,7 @@ namespace TSUT.HeatManagement
         double GetO2Available()
         {
             double total = 0;
-            var tanks = FindConnectedO2TanksThroughConveyor();
+            var tanks = FindConnectedO2Tanks();
             foreach (IMyGasTank tank in tanks)
             {
                 total += tank.Capacity * tank.FilledRatio;
@@ -253,7 +341,7 @@ namespace TSUT.HeatManagement
         
         bool ConsumeO2(float shouldBeConsumed)
         {
-            var tanks = FindConnectedO2TanksThroughConveyor();
+            var tanks = FindConnectedO2Tanks();
             foreach (IMyGasTank tank in tanks)
             {
                 if (tank.FilledRatio == 0)

@@ -18,6 +18,7 @@ namespace TSUT.HeatManagement
         private int neighborCallCount = 0;
         private float blocksTimeAccumulator = 0f;
         private float neighborsTimeAccumulator = 0f;
+        private GridO2Manager _o2manager;
 
         public GridHeatManager(IMyCubeGrid grid, bool lazy = false)
         {
@@ -427,6 +428,21 @@ namespace TSUT.HeatManagement
                 }
             }
             return maxTemp;
+        }
+
+        public void AttachO2Manager(GridO2Manager manager)
+        {
+            _o2manager = manager;
+        }
+
+        public float ConsumeO2(float amount, float deltaTime, IMyCubeBlock block)
+        {
+            return _o2manager.ConsumeO2(amount, deltaTime, block);
+        }
+
+        public bool HasEnoughO2(float amount, float deltaTime, IMyCubeBlock block)
+        {
+            return _o2manager.HasEnoughO2(amount, deltaTime, block);
         }
     }
 

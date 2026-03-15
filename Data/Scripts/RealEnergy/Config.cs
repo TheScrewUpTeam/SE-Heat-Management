@@ -16,6 +16,8 @@ namespace TSUT.HeatManagement
 
         public static string HeatDebugString = "HeatDebug";
 
+        public static float ABSOLUTE_ZERO_CELSIUS = -273.15f;
+
         public string HEAT_SYSTEM_VERSION = "1.2.4";
         public bool HEAT_SYSTEM_AUTO_UPDATE = true;
         public float HEAT_COOLDOWN_COEFF { get; set; } = 20f;

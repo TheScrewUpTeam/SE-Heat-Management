@@ -2,7 +2,7 @@
 
 This guide explains how 3rd party modders can integrate with the Heat Management System (HMS) mod for Space Engineers. You only need to include the `HmsApiV1.0.cs` file in your own mod project to get started.
 
-Current API Version: 1.0.1
+Current API Version: 1.0.2
 
 ---
 
@@ -146,7 +146,120 @@ public class MyCustomHeatBehavior : HmsApi.AHeatBehavior
 
 ---
 
-## 7. License
+## 7. Terminal Property Integration
+
+### Heat Temperature Display
+
+HMS automatically adds a read-only "Heat Temperature" property to all terminal blocks in the control panel. This property displays the current heat value of any block using the HMS system.
+
+**Features:**
+
+- Displays current heat value in degrees Celsius
+- Updates in real-time as block temperatures change
+- Read-only (cannot be modified by players)
+- Visible for all blocks with heat management enabled
+- Available in both single-player and multiplayer
+
+**Accessing the Property:**
+
+The Heat Temperature property is accessible programmatically via in-game scripts using the `GetValue<T>()` method:
+
+```csharp
+public void Main(string argument, UpdateType updateSource)
+{
+    var battery = GridTerminalSystem.GetBlockWithName("Test Battery");
+    float temp = battery.GetValue<float>("HeatTemperature");
+    Echo($"Temperature: {temp}");
+}
+```
+
+This allows you to read the current heat value from any terminal block in your programmable block scripts.
+
+---
+
+## 8. O2 Distribution System Integration
+
+The HMS now includes an internal O2 Distribution System that can be used by 3rd party mods to manage oxygen consumption across conveyor-connected blocks. This system automatically accounts for O2 production and storage across the entire conveyor network.
+
+### Consuming O2
+
+```csharp
+// Consume O2 from the distribution system
+// Returns: The amount of O2 that could not be fulfilled by production/storage
+float unmetDemand = _hmsApi.Utils.ConsumeO2(
+    amount: 10f,              // Amount of O2 to consume (in L)
+    deltaTime: 0.016f,        // Time interval that consumtion happened (in seconds)
+    block: consumingBlock     // The block consuming the O2
+);
+
+if (unmetDemand > 0.001f)
+{
+    // Not enough O2 available - handle shortage
+    ApplyO2ProductionPenalty(unmetDemand);
+}
+```
+
+### Checking O2 Availability
+
+```csharp
+// Check if there's enough O2 without consuming anything
+// Useful for previewing O2 requirements or condition checking
+bool hasEnough = _hmsApi.Utils.HasEnoughO2(
+    amount: 5f,               // Amount of O2 required (in L)
+    deltaTime: 0.016f,        // Time interval that consumtion happened (in seconds)
+    block: requestingBlock    // The block checking for O2
+);
+
+if (hasEnough)
+{
+    // Safe to start O2-dependent operations
+    ActivateO2DependedSystems();
+}
+```
+
+### How It Works
+
+The O2 Distribution System automatically:
+- Collects O2 from all connected producers (Oxygen Farms, Tanks) via conveyors
+- Tracks available O2 storage capacity across the network
+- Distributes O2 consumption fairly based on requests
+- Returns any unmet demand for your mod to handle
+
+**Requirements:**
+- Blocks must be conveyor-connected to the O2 network
+- O2 producers/generators must be available in the network
+- Blocks must provide their EntityId when requesting O2
+
+### Integration Example
+
+```csharp
+public class MyO2DependentBlock : MyLogicComponent
+{
+    private HmsApi _hmsApi;
+    private float _o2ConsumptionRate = 5.0f; // L/s
+
+    public override void UpdateAfterSimulation()
+    {
+        if (_hmsApi != null && _hmsApi.Utils != null)
+        {
+            // Try to consume required O2
+            float unmetO2 = _hmsApi.Utils.ConsumeO2(
+                _o2ConsumptionRate * MyEngineConstants.UPDATE_STEP_SIZE_IN_SECONDS,
+                MyEngineConstants.UPDATE_STEP_SIZE_IN_SECONDS,
+                this.Block
+            );
+
+            if (unmetO2 > 0.001f)
+            {
+                // O2 shortage - reduce efficiency, damage block, emit warning, etc.
+                ApplyO2ShortagePenalty(unmetO2);
+            }
+        }
+    }
+}
+```
+
+## 9. License
 
 See `LICENSE.txt` for usage terms.
 

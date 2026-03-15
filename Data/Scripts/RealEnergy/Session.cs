@@ -41,6 +41,16 @@ namespace TSUT.HeatManagement
 
         private HeatCommands _commandsInstance;
         public static HeatSession Instance { get; private set; }
+        static bool temperaturePropertyCreated = false;
+
+        public static void AttachO2GridManager(GridO2Manager manager, IMyCubeGrid grid)
+        {
+            GridHeatManager heatManager;
+            if (!_gridHeatManagers.TryGetValue(grid, out heatManager))
+                return;
+
+            heatManager.AttachO2Manager(manager);
+        }
 
         public override void LoadData()
         {
@@ -64,6 +74,29 @@ namespace TSUT.HeatManagement
             MyAPIGateway.Utilities.SendModMessage(HmsApi.HeatApiMessageId, shareable);
             MyLog.Default.WriteLine($"[HeatManagement] HeatAPI populated");
             _commandsInstance = HeatCommands.Instance; // Initialize commands
+        }
+
+        private static void AddTemperaturePropertyControl()
+        {
+            if (MyAPIGateway.Utilities.IsDedicated)
+                return;
+
+            if (temperaturePropertyCreated)
+                return;
+
+            temperaturePropertyCreated = true;
+
+            var property =
+                MyAPIGateway.TerminalControls.CreateProperty<float, IMyTerminalBlock>("HeatTemperature");
+
+            property.Getter = (b) =>
+            {
+                return _heatApi.Utils.GetHeat(b);
+            };
+
+            property.Setter = (b, v) => { }; // read-only
+
+            MyAPIGateway.TerminalControls.AddControl<IMyTerminalBlock>(property);
         }
 
         private void OnHeatProviderRegister(object obj)
@@ -107,6 +140,7 @@ namespace TSUT.HeatManagement
             _commandsInstance?.Unload();
             networking?.Unregister();
             MyAPIGateway.Utilities.UnregisterMessageHandler(HmsApi.HeatProviderMesageId, OnHeatProviderRegister);
+            MyAPIGateway.TerminalControls.CustomControlGetter -= AddShowNetworksControl;
         }
 
         public override void BeforeStart()
@@ -115,7 +149,8 @@ namespace TSUT.HeatManagement
             MyAPIGateway.Utilities.SendModMessage(HmsApi.HeatApiMessageId, shareable);
             MyLog.Default.WriteLine($"[HeatManagement] HeatAPI populated late");
             networking.Register();
-            RegisterDebugControl();
+            RegisterCustomControls();
+            AddTemperaturePropertyControl();
 
             HashSet<IMyEntity> allEntities = new HashSet<IMyEntity>();
             MyAPIGateway.Entities.GetEntities(allEntities);
@@ -394,20 +429,10 @@ namespace TSUT.HeatManagement
             }
         }
 
-        public static void RegisterDebugControl()
-        {
-            if (_initialized)
-                return;
-
-            _initialized = true;
-
-            MyAPIGateway.TerminalControls.CustomControlGetter += OnCustomControlGetter;
-        }
-
         public static bool GetGridHeatManager(IMyCubeGrid grid, out GridHeatManager manager)
         {
             if (_gridHeatManagers.TryGetValue(grid, out manager))
-                return false;
+                return true;
 
             manager = new GridHeatManager(grid);
             _gridHeatManagers[grid] = manager;
@@ -461,7 +486,18 @@ namespace TSUT.HeatManagement
             return slimBlocks.Count == 1 && slimBlocks[0].FatBlock is IMyWheel;
         }
 
-        private static void OnCustomControlGetter(IMyTerminalBlock block, List<IMyTerminalControl> controls)
+        public static void RegisterCustomControls()
+        {
+            VentHeatManager.RegisterCustomActions();
+            if (_initialized)
+                return;
+
+            _initialized = true;
+
+            MyAPIGateway.TerminalControls.CustomControlGetter += AddShowNetworksControl;
+        }
+
+        private static void AddShowNetworksControl(IMyTerminalBlock block, List<IMyTerminalControl> controls)
         {
             if (!(block is IMyBatteryBlock))
                 return;
@@ -582,6 +618,22 @@ namespace TSUT.HeatManagement
                             MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock,
                             MyAPIGateway.Entities.GetEntityById(neighborBlockId) as IMyCubeBlock,
                             dt))
+                },
+                {
+                    "ConsumeO2", new Func<float, float, long, float>((amount, deltaTime, blockId) =>
+                        heatApi.Utils.ConsumeO2(
+                            amount,
+                            deltaTime,
+                            MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock
+                            ))
+                },
+                {
+                    "HasEnoughO2", new Func<float, float, long, bool>((amount, deltaTime, blockId) =>
+                        heatApi.Utils.HasEnoughO2(
+                            amount,
+                            deltaTime,
+                            MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock
+                            ))
                 },
                 {
                     "GetHmsConfig", new Func<object>(() =>

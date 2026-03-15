@@ -86,7 +86,9 @@ namespace TSUT.HeatManagement
             if (float.IsNaN(heat) || float.IsInfinity(heat))
             {
                 MyAPIGateway.Utilities.ShowNotification($"Wrong heat value for {block.DisplayNameText}: {heat}", 1000);
+                return;
             }
+            heat = Math.Max(heat, Config.ABSOLUTE_ZERO_CELSIUS);
             block.Storage[HeatKey] = heat.ToString();
             if (!silent)
             {
@@ -308,6 +310,8 @@ namespace TSUT.HeatManagement
 
         public float GetThermalCapacity(IMyCubeBlock block)
         {
+            if (block == null)
+                return 0f;
             if (_cacheTermalCapacity.ContainsKey(block.DisplayNameText))
             {
                 return _cacheTermalCapacity[block.DisplayNameText];
@@ -449,7 +453,7 @@ namespace TSUT.HeatManagement
         {
             if (neighbor == null || block == null)
                 return 0f;
-                
+
             if (conductivity < 0f)
             {
                 conductivity = Config.Instance.THERMAL_CONDUCTIVITY;
@@ -478,7 +482,7 @@ namespace TSUT.HeatManagement
             var networkManager = heatBehaviour as HeatPipeManager;
 
             var energyTransferred = networkManager.GetHeatExchange(networkBlock, block, deltaTime);
-            
+
             return energyTransferred;
         }
 
@@ -493,7 +497,7 @@ namespace TSUT.HeatManagement
                 return delta;
 
             delta += GetExchangeWithNeighbor(block, neighborBlock, deltaTime);
-            
+
 
             return delta;
         }
@@ -538,7 +542,7 @@ namespace TSUT.HeatManagement
 
             totalJoulesRemoved = ApplyExchangeLimit(totalJoulesRemoved, capacity, capacity, deltaT);
 
-            return totalJoulesRemoved /capacity; // Return °C/sec
+            return totalJoulesRemoved / capacity; // Return °C/sec
         }
 
         public float GetActiveThrusterHeatLoss(IMyThrust thruster, float thrustRatio, float deltaTime)
@@ -576,6 +580,26 @@ namespace TSUT.HeatManagement
             };
 
             HeatSession.networking?.RelayToClients(msg);
+        }
+
+        public float ConsumeO2(float amount, float deltaTime, IMyCubeBlock block)
+        {
+            GridHeatManager manager;
+            if (!HeatSession.GetGridHeatManager(block.CubeGrid, out manager))
+                return amount;
+
+            return manager.ConsumeO2(amount, deltaTime, block);
+        }
+
+        public bool HasEnoughO2(float amount, float deltaTime, IMyCubeBlock block)
+        {
+            GridHeatManager manager;
+            if (!HeatSession.GetGridHeatManager(block.CubeGrid, out manager))
+            {
+                return false;
+            }
+
+            return manager.HasEnoughO2(amount, deltaTime, block);
         }
     }
 }
