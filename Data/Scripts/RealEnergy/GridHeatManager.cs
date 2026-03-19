@@ -38,6 +38,8 @@ namespace TSUT.HeatManagement
                 }
             }
 
+            MyLog.Default.WriteLine($"[HeatManagement.GridManager] Factories processed...");
+
             var gridId = grid.EntityId;
             var providers = HeatSession.Api.Registry.GetHeatBehaviorProviders().ToList();
             foreach (var provider in providers)
@@ -48,16 +50,22 @@ namespace TSUT.HeatManagement
                 try
                 {
                     IDictionary<long, IDictionary<string, object>> behaviors = provider(gridId);
-                    foreach (var kvp in behaviors)
+                    if (behaviors.Count > 0)
                     {
-                        var blockId = kvp.Key;
-                        var behavior = kvp.Value;
-                        if (behavior == null)
-                            continue;
-                        var block = MyAPIGateway.Entities.GetEntityById(blockId) as MyCubeBlock;
-                        if (block != null && !_heatBehaviors.ContainsKey(block))
+                        lock (_heatBehaviors)
                         {
-                            _heatBehaviors[block] = new DelegateHeatBehavior(behavior, block);
+                            foreach (var kvp in behaviors)
+                            {
+                                var blockId = kvp.Key;
+                                var behavior = kvp.Value;
+                                if (behavior == null)
+                                    continue;
+                                var block = MyAPIGateway.Entities.GetEntityById(blockId) as MyCubeBlock;
+                                if (block != null && !_heatBehaviors.ContainsKey(block))
+                                {
+                                    _heatBehaviors[block] = new DelegateHeatBehavior(behavior, block);
+                                }
+                            }
                         }
                     }
                 }
@@ -66,6 +74,8 @@ namespace TSUT.HeatManagement
                     MyLog.Default.Warning($"[HeatManagement] Provider {provider.GetType().Name} threw exception on provide behaviors: {ex}");
                 }
             }
+
+            MyLog.Default.WriteLine($"[HeatManagement.GridManager] Providers processed...");
 
             if (!lazy)
             {
@@ -437,11 +447,19 @@ namespace TSUT.HeatManagement
 
         public float ConsumeO2(float amount, float deltaTime, IMyCubeBlock block)
         {
+            if (_o2manager == null)
+            {
+                return amount;
+            }
             return _o2manager.ConsumeO2(amount, deltaTime, block);
         }
 
         public bool HasEnoughO2(float amount, float deltaTime, IMyCubeBlock block)
         {
+            if (_o2manager == null)
+            {
+                return false;
+            }
             return _o2manager.HasEnoughO2(amount, deltaTime, block);
         }
     }

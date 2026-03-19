@@ -199,8 +199,10 @@ namespace TSUT.HeatManagement
             // Always subscribe to ownership changes for all terminal blocks
             if (!_ownershipSubscribedGrids.Contains(grid))
             {
+                MyLog.Default.WriteLine($"[HeatManagement] Processing allowed...");
                 var terminalBlocks = new List<IMyTerminalBlock>();
                 MyAPIGateway.TerminalActionsHelper.GetTerminalSystemForGrid(grid).GetBlocksOfType(terminalBlocks);
+                MyLog.Default.WriteLine($"[HeatManagement] Blocks to process: {terminalBlocks.Count}");
                 foreach (var block in terminalBlocks)
                 {
                     block.OwnershipChanged += OnAnyBlockOwnershipChanged;
@@ -212,6 +214,8 @@ namespace TSUT.HeatManagement
             // If config is set, only add grids owned by the local player
             if (Config != null && Config.LIMIT_TO_PLAYER_GRIDS && !IsPlayrGrid(grid))
                 return;
+
+            MyLog.Default.WriteLine($"[HeatManagement] Blocks processed, creating the manager.");
 
             _gridHeatManagers[grid] = new GridHeatManager(grid);
 
@@ -427,6 +431,14 @@ namespace TSUT.HeatManagement
             {
                 MyLog.Default.WriteLine($"[HeatManagement] Exception in UpdateNetowkrsUI: {e}");
             }
+        }
+
+        public static bool TryGetGridHeatManager(IMyCubeGrid grid, out GridHeatManager manager)
+        {
+            if (_gridHeatManagers.TryGetValue(grid, out manager))
+                return true;
+                
+            return false;
         }
 
         public static bool GetGridHeatManager(IMyCubeGrid grid, out GridHeatManager manager)

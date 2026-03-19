@@ -585,7 +585,7 @@ namespace TSUT.HeatManagement
         public float ConsumeO2(float amount, float deltaTime, IMyCubeBlock block)
         {
             GridHeatManager manager;
-            if (!HeatSession.GetGridHeatManager(block.CubeGrid, out manager))
+            if (!HeatSession.TryGetGridHeatManager(block.CubeGrid, out manager))
                 return amount;
 
             return manager.ConsumeO2(amount, deltaTime, block);
@@ -594,7 +594,7 @@ namespace TSUT.HeatManagement
         public bool HasEnoughO2(float amount, float deltaTime, IMyCubeBlock block)
         {
             GridHeatManager manager;
-            if (!HeatSession.GetGridHeatManager(block.CubeGrid, out manager))
+            if (!HeatSession.TryGetGridHeatManager(block.CubeGrid, out manager))
             {
                 return false;
             }

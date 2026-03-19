@@ -187,7 +187,7 @@ namespace TSUT.HeatManagement
             var o2Exchange = 0f;
 
             var turboO2Usage = GetO2Turbo(_vent);
-            var supplyGranted = _gridManager.HasEnoughO2(turboO2Usage, 1, Block);
+            var supplyGranted = turboO2Usage > 0 && _gridManager.HasEnoughO2(turboO2Usage, 1, Block);
                 
             if (_vent.IsWorking && supplyGranted)
             {
