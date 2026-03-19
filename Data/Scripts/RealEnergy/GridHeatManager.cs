@@ -52,19 +52,16 @@ namespace TSUT.HeatManagement
                     IDictionary<long, IDictionary<string, object>> behaviors = provider(gridId);
                     if (behaviors.Count > 0)
                     {
-                        lock (_heatBehaviors)
+                        foreach (var kvp in behaviors)
                         {
-                            foreach (var kvp in behaviors)
+                            var blockId = kvp.Key;
+                            var behavior = kvp.Value;
+                            if (behavior == null)
+                                continue;
+                            var block = MyAPIGateway.Entities.GetEntityById(blockId) as MyCubeBlock;
+                            if (block != null && !_heatBehaviors.ContainsKey(block))
                             {
-                                var blockId = kvp.Key;
-                                var behavior = kvp.Value;
-                                if (behavior == null)
-                                    continue;
-                                var block = MyAPIGateway.Entities.GetEntityById(blockId) as MyCubeBlock;
-                                if (block != null && !_heatBehaviors.ContainsKey(block))
-                                {
-                                    _heatBehaviors[block] = new DelegateHeatBehavior(behavior, block);
-                                }
+                                _heatBehaviors[block] = new DelegateHeatBehavior(behavior, block);
                             }
                         }
                     }
@@ -187,13 +184,17 @@ namespace TSUT.HeatManagement
             {
                 HeatSession.Api.Utils.DropTemperature(block);
             }
+
+            Dictionary<IMyCubeBlock, IHeatBehavior> snapshot;
             lock (_heatBehaviors)
             {
-                foreach (var kvp in _heatBehaviors)
-                {
-                    var temp = HeatSession.Api.Utils.GetHeat(kvp.Key);
-                    kvp.Value.ReactOnNewHeat(temp);
-                }
+                snapshot = new Dictionary<IMyCubeBlock, IHeatBehavior>(_heatBehaviors);
+            }
+
+            foreach (var kvp in snapshot)
+            {
+                var temp = HeatSession.Api.Utils.GetHeat(kvp.Key);
+                kvp.Value.ReactOnNewHeat(temp);
             }
         }
 
@@ -276,8 +277,14 @@ namespace TSUT.HeatManagement
             }
             HashSet<IHeatBehavior> called = new HashSet<IHeatBehavior>();
 
+            Dictionary<IMyCubeBlock, IHeatBehavior> snapshot;
+            lock (_heatBehaviors)
+            {
+                snapshot = new Dictionary<IMyCubeBlock, IHeatBehavior>(_heatBehaviors);
+            }
+
             // Spread heat between neighbors
-            foreach (var kvp in _heatBehaviors)
+            foreach (var kvp in snapshot)
             {
                 if (called.Contains(kvp.Value))
                     continue;
@@ -297,13 +304,21 @@ namespace TSUT.HeatManagement
                     MyLog.Default.Warning($"[HeatManagement] Behavior {behavior.GetType().Name} threw exception on spread heat: {ex}");
                 }
             }
+
             neighborsTimeAccumulator = 0;
         }
 
         private void UpdatePipeNetworks(float deltaTime)
         {
             HashSet<IHeatBehavior> called = new HashSet<IHeatBehavior>();
-            foreach (var kvp in _heatBehaviors)
+
+            Dictionary<IMyCubeBlock, IHeatBehavior> snapshot;
+            lock (_heatBehaviors)
+            {
+                snapshot = new Dictionary<IMyCubeBlock, IHeatBehavior>(_heatBehaviors);
+            }
+
+            foreach (var kvp in snapshot)
             {
                 if (called.Contains(kvp.Value))
                     continue;
@@ -392,7 +407,13 @@ namespace TSUT.HeatManagement
         {
             if (_showDebug)
             {
-                foreach (var behavior in _heatBehaviors.Values)
+                Dictionary<IMyCubeBlock, IHeatBehavior> snapshot;
+                lock (_heatBehaviors)
+                {
+                    snapshot = new Dictionary<IMyCubeBlock, IHeatBehavior>(_heatBehaviors);
+                }
+
+                foreach (var behavior in snapshot.Values)
                 {
                     if (behavior is IMultiBlockHeatBehavior)
                     {
@@ -428,7 +449,13 @@ namespace TSUT.HeatManagement
         internal float GetMaxTemperature()
         {
             float maxTemp = float.MinValue;
-            foreach (var kvp in _heatBehaviors)
+            Dictionary<IMyCubeBlock, IHeatBehavior> snapshot;
+            lock (_heatBehaviors)
+            {
+                snapshot = new Dictionary<IMyCubeBlock, IHeatBehavior>(_heatBehaviors);
+            }
+
+            foreach (var kvp in snapshot)
             {
                 IMyCubeBlock block = kvp.Key;
                 float temp = HeatSession.Api.Utils.GetHeat(block);
