@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using Sandbox.ModAPI;
 using VRage.Game.ModAPI;
@@ -8,6 +9,8 @@ namespace TSUT.HeatManagement
 {
     public class ConnectorHeatManagerFactory : IHeatBehaviorFactory
     {
+        private static bool _propertyAdded = false;
+
         public int Priority => 15;
 
         public void CollectHeatBehaviors(IMyCubeGrid grid, IGridHeatManager manager, IDictionary<IMyCubeBlock, IHeatBehavior> behaviorMap)
@@ -35,6 +38,23 @@ namespace TSUT.HeatManagement
             result.Behavior = new ConnectorHeatManager(block as IMyShipConnector);
             result.AffectedBlocks = new List<IMyCubeBlock> { block };
             return result;
+        }
+
+        public void RegisterCustomControls()
+        {
+            MyAPIGateway.TerminalControls.CustomControlGetter += (block, controls) =>
+            {
+                // if (!(block is IMyShipConnector))
+                //     return;
+
+                // Only add if it doesn't already exist
+                if (controls.Any(c => c.Id == "HeatTemperature") || _propertyAdded)
+                    return;
+                
+                _propertyAdded = true;
+
+                HeatSession.Api.Utils.TryRegister<IMyShipConnector>();
+            };
         }
     }
 

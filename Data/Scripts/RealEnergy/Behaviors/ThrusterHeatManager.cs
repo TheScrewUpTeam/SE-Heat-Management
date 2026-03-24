@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using Sandbox.ModAPI;
 using VRage.Game.ModAPI;
@@ -8,6 +9,7 @@ namespace TSUT.HeatManagement
     public class ThrusterHeatManagerFactory : IHeatBehaviorFactory
     {
         const string THRUSTER_CODE = "AtmosphericThrust";
+        private static bool _propertyAdded = false;
 
         public void CollectHeatBehaviors(IMyCubeGrid grid, IGridHeatManager manager, IDictionary<IMyCubeBlock, IHeatBehavior> behaviorMap)
         {
@@ -34,6 +36,23 @@ namespace TSUT.HeatManagement
                 return result;
             }
             return result; // No behavior created for non-thruster blocks
+        }
+
+        public void RegisterCustomControls()
+        {
+            MyAPIGateway.TerminalControls.CustomControlGetter += (block, controls) =>
+            {
+                // if (!(block is IMyThrust))
+                //     return;
+
+                // Only add if it doesn't already exist
+                if (controls.Any(c => c.Id == "HeatTemperature") || _propertyAdded)
+                    return;
+
+                _propertyAdded = true;
+
+                HeatSession.Api.Utils.TryRegister<IMyThrust>();
+            };
         }
 
         public int Priority => 30; // Thrusters are less critical than batteries and vents

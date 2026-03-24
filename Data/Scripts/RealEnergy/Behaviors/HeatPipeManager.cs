@@ -489,6 +489,11 @@ namespace TSUT.HeatManagement
             return result;
         }
 
+        public void RegisterCustomControls()
+        {
+            // Not needed
+        }
+
         public int Priority => 15; // Between batteries and vents
     }
 

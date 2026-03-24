@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Sandbox.Game.Entities;
 using Sandbox.ModAPI;
+using Sandbox.ModAPI.Interfaces.Terminal;
 using SpaceEngineers.Game.ModAPI;
 using VRage.Game.ModAPI;
 using VRageMath;
@@ -47,6 +48,7 @@ namespace TSUT.HeatManagement
         void CollectHeatBehaviors(IMyCubeGrid grid, IGridHeatManager manager, IDictionary<IMyCubeBlock, IHeatBehavior> behaviorMap);
         HeatBehaviorAttachResult OnBlockAdded(IMyCubeBlock block, IGridHeatManager manager);
         int Priority { get; }
+        void RegisterCustomControls();
     }
 
     public interface IHeatRegistry
@@ -93,6 +95,8 @@ namespace TSUT.HeatManagement
         float ApplyExchangeLimit(float energyDelta, float capA, float capB, float tempDiff);
         float ConsumeO2(float amount, float deltaTime, IMyCubeBlock block);
         bool HasEnoughO2(float amount, float deltaTime, IMyCubeBlock block);
+        IMyTerminalControlProperty<float> CreateProperty<TBlock>() where TBlock: IMyTerminalBlock;
+        void TryRegister<T>() where T : IMyTerminalBlock;
     }
 
     public interface IHeatEffects

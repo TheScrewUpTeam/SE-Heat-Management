@@ -76,28 +76,61 @@ namespace TSUT.HeatManagement
             _commandsInstance = HeatCommands.Instance; // Initialize commands
         }
 
-        private static void AddTemperaturePropertyControl()
-        {
-            if (MyAPIGateway.Utilities.IsDedicated)
-                return;
+        // private static IMyTerminalControlProperty<float> CreateProperty<TBlock>() where TBlock: IMyTerminalBlock
+        // {
+        //     var property =
+        //         MyAPIGateway.TerminalControls.CreateProperty<float, TBlock>("HeatTemperature");
 
-            if (temperaturePropertyCreated)
-                return;
+        //     property.Getter = (b) =>
+        //     {
+        //         if (_heatApi == null || _heatApi.Utils == null)
+        //         {
+        //             return 0f;
+        //         }
+        //         return _heatApi.Utils.GetHeat(b);
+        //     };
 
-            temperaturePropertyCreated = true;
+        //     property.Setter = (b, v) => { }; // read-only
 
-            var property =
-                MyAPIGateway.TerminalControls.CreateProperty<float, IMyTerminalBlock>("HeatTemperature");
+        //     return property;
+        // }
 
-            property.Getter = (b) =>
-            {
-                return _heatApi.Utils.GetHeat(b);
-            };
+        // private static void TryRegister<T>() where T : IMyTerminalBlock
+        // {
+        //     try
+        //     {
+        //         var prop = CreateProperty<T>();
+        //         if (prop == null)
+        //             return;
 
-            property.Setter = (b, v) => { }; // read-only
+        //         MyAPIGateway.TerminalControls.AddControl<T>(prop);
+        //     }
+        //     catch (Exception e)
+        //     {
+        //         MyLog.Default.WriteLine($"[HeatSystem] Failed to register property for {typeof(T).Name}: {e}");
+        //     }
+        // }
 
-            MyAPIGateway.TerminalControls.AddControl<IMyTerminalBlock>(property);
-        }
+        // private static void AddTemperaturePropertyControl()
+        // {
+        //     if (temperaturePropertyCreated)
+        //         return;
+
+        //     temperaturePropertyCreated = true;
+
+        //     TryRegister<IMyBatteryBlock>();
+        //     TryRegister<IMyAirVent>();
+        //     TryRegister<IMyThrust>();
+        // }
+
+        // private static void AddHeatTemperatureProperty(IMyTerminalBlock block, List<IMyTerminalControl> controls)
+        // {
+        //     // Only add if it doesn't already exist
+        //     if (controls.Any(c => c.Id == "HeatTemperature"))
+        //         return;
+
+        //     AddTemperaturePropertyControl();
+        // }
 
         private void OnHeatProviderRegister(object obj)
         {
@@ -150,7 +183,6 @@ namespace TSUT.HeatManagement
             MyLog.Default.WriteLine($"[HeatManagement] HeatAPI populated late");
             networking.Register();
             RegisterCustomControls();
-            AddTemperaturePropertyControl();
 
             HashSet<IMyEntity> allEntities = new HashSet<IMyEntity>();
             MyAPIGateway.Entities.GetEntities(allEntities);
@@ -500,13 +532,20 @@ namespace TSUT.HeatManagement
 
         public static void RegisterCustomControls()
         {
-            VentHeatManager.RegisterCustomActions();
+            foreach(var factory in _heatApi.Registry.GetFactories())
+            {
+                factory.RegisterCustomControls();
+                MyAPIGateway.Utilities.ShowMessage("HeatManagement", $"Custom controls registered for {factory.GetType().Name}");
+            }
+            // VentHeatManager.RegisterCustomActions();
+            // AddTemperaturePropertyControl();
             if (_initialized)
                 return;
 
             _initialized = true;
 
             MyAPIGateway.TerminalControls.CustomControlGetter += AddShowNetworksControl;
+            // MyAPIGateway.TerminalControls.CustomControlGetter += AddHeatTemperatureProperty;
         }
 
         private static void AddShowNetworksControl(IMyTerminalBlock block, List<IMyTerminalControl> controls)

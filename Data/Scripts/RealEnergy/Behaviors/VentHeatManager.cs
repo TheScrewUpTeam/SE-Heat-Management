@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.Serialization.Formatters;
 using System.Text;
 using Sandbox.Game;
@@ -14,6 +15,9 @@ namespace TSUT.HeatManagement
 {
     public class VentHeatManagerFactory : IHeatBehaviorFactory
     {
+        private static bool _controlsInitialized = false;
+        private static bool _propertyAdded = false;
+
         public void CollectHeatBehaviors(IMyCubeGrid grid, IGridHeatManager manager, IDictionary<IMyCubeBlock, IHeatBehavior> behaviorMap)
         {
             List<IMyAirVent> vents = new List<IMyAirVent>();
@@ -41,6 +45,93 @@ namespace TSUT.HeatManagement
             return result; // No behavior created for non-vent blocks
         }
 
+        public void RegisterCustomControls()
+        {
+            if (_controlsInitialized)
+                return;
+
+            MyAPIGateway.TerminalControls.CustomControlGetter += (block, controls) =>
+            {
+                // if (!(block is IMyAirVent))
+                //     return;
+
+                // Only add if it doesn't already exist
+                if (controls.Any(c => c.Id == "HeatTemperature") || _propertyAdded)
+                    return;
+                
+                _propertyAdded = true;
+
+                HeatSession.Api.Utils.TryRegister<IMyAirVent>();
+            };
+
+            MyAPIGateway.TerminalControls.CustomActionGetter += (block, controls) =>
+            {
+                if (!(block is IMyAirVent))
+                    return;
+
+                // Only add if it doesn't already exist
+                if (controls.Any(c => c.Id == "O2TurboIncrease"))
+                    return;
+
+                var turboSelectorIncr = MyAPIGateway.TerminalControls.CreateAction<IMyAirVent>("O2TurboIncrease");
+                turboSelectorIncr.Name = new StringBuilder("Increase O2 Usage For Cooling");
+                turboSelectorIncr.Enabled = b => !(b as IMyAirVent).CanPressurize;
+                turboSelectorIncr.Icon = @"Textures\GUI\Icons\Actions\Increase.dds";
+                turboSelectorIncr.Action = b =>
+                {
+                    var limit = VentHeatManager.GetO2TurboMax(b);
+                    float current = VentHeatManager.GetO2Turbo(b);
+                    float step = limit / 10f;
+                    float newValue = current + step;
+                    if (newValue > limit)
+                    {
+                        newValue = limit;
+                    }
+                    VentHeatManager.SetO2Turbo(b, newValue);
+                };
+                turboSelectorIncr.Writer = (b, sb) =>
+                {
+                    sb.Append($"{VentHeatManager.GetO2Turbo(b):F2}L/s");
+                };
+                controls.Add(turboSelectorIncr);
+                // MyAPIGateway.TerminalControls.AddAction<IMyAirVent>(turboSelectorIncr);
+            };
+
+            MyAPIGateway.TerminalControls.CustomActionGetter += (block, controls) =>
+            {
+                if (!(block is IMyAirVent))
+                    return;
+
+                // Only add if it doesn't already exist
+                if (controls.Any(c => c.Id == "O2TurboDecrease"))
+                    return;
+
+                var turboSelectorDecr = MyAPIGateway.TerminalControls.CreateAction<IMyAirVent>("O2TurboDecrease");
+                turboSelectorDecr.Name = new StringBuilder("Decrease O2 Usage For Cooling");
+                turboSelectorDecr.Enabled = b => !(b as IMyAirVent).CanPressurize;
+                turboSelectorDecr.Icon = @"Textures\GUI\Icons\Actions\Decrease.dds";
+                turboSelectorDecr.Action = b =>
+                {
+                    float current = VentHeatManager.GetO2Turbo(b);
+                    float step = VentHeatManager.GetO2TurboMax(b) / 10f;
+                    float newValue = current - step;
+                    if (newValue < 0f)
+                    {
+                        newValue = 0;
+                    }
+                    VentHeatManager.SetO2Turbo(b, newValue);
+                };
+                turboSelectorDecr.Writer = (b, sb) =>
+                {
+                    sb.Append($"{VentHeatManager.GetO2Turbo(b):F2}L/s");
+                };
+                controls.Add(turboSelectorDecr);
+                // MyAPIGateway.TerminalControls.AddAction<IMyAirVent>(turboSelectorDecr);
+            };
+
+            _controlsInitialized = true;
+        }
+
         public int Priority => 20; // Vents are less critical than batteries
     }
 
@@ -60,12 +151,12 @@ namespace TSUT.HeatManagement
             MyAPIGateway.TerminalControls.CustomControlGetter += OnCustomControlGetter;
         }
 
-        private static void SetO2Turbo(IMyCubeBlock block, float o2turbo)
+        public static void SetO2Turbo(IMyCubeBlock block, float o2turbo)
         {
             block.Storage[Config.O2TurboKey] = o2turbo.ToString();
         }
 
-        private static float GetO2Turbo(IMyCubeBlock block)
+        public static float GetO2Turbo(IMyCubeBlock block)
         {
             if ((block as IMyAirVent).CanPressurize)
             {
@@ -85,7 +176,7 @@ namespace TSUT.HeatManagement
             return 0f;
         }
 
-        private static float GetO2TurboMax(IMyTerminalBlock block)
+        public static float GetO2TurboMax(IMyTerminalBlock block)
         {
             return block.CubeGrid.GridSizeEnum == MyCubeSize.Large ? 500f : 50f;
         }

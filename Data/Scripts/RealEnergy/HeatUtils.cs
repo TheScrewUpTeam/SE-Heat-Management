@@ -5,9 +5,11 @@ using Sandbox.Game;
 using Sandbox.Game.Entities;
 using Sandbox.Game.EntityComponents;
 using Sandbox.ModAPI;
+using Sandbox.ModAPI.Interfaces.Terminal;
 using SpaceEngineers.Game.ModAPI;
 using VRage.Game;
 using VRage.Game.ModAPI;
+using VRage.Utils;
 using VRageMath;
 
 namespace TSUT.HeatManagement
@@ -600,6 +602,41 @@ namespace TSUT.HeatManagement
             }
 
             return manager.HasEnoughO2(amount, deltaTime, block);
+        }
+
+        public IMyTerminalControlProperty<float> CreateProperty<TBlock>() where TBlock: IMyTerminalBlock
+        {
+            var property =
+                MyAPIGateway.TerminalControls.CreateProperty<float, TBlock>("HeatTemperature");
+
+            property.Getter = (b) =>
+            {
+                if (HeatSession.Api == null || HeatSession.Api.Utils == null)
+                {
+                    return 0f;
+                }
+                return HeatSession.Api.Utils.GetHeat(b);
+            };
+
+            property.Setter = (b, v) => { }; // read-only
+
+            return property;
+        }
+
+        public void TryRegister<T>() where T : IMyTerminalBlock
+        {
+            try
+            {
+                var prop = CreateProperty<T>();
+                if (prop == null)
+                    return;
+
+                MyAPIGateway.TerminalControls.AddControl<T>(prop);
+            }
+            catch (Exception e)
+            {
+                MyLog.Default.WriteLine($"[HeatSystem] Failed to register property for {typeof(T).Name}: {e}");
+            }
         }
     }
 }
