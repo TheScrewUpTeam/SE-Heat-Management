@@ -535,7 +535,6 @@ namespace TSUT.HeatManagement
             foreach(var factory in _heatApi.Registry.GetFactories())
             {
                 factory.RegisterCustomControls();
-                MyAPIGateway.Utilities.ShowMessage("HeatManagement", $"Custom controls registered for {factory.GetType().Name}");
             }
             // VentHeatManager.RegisterCustomActions();
             // AddTemperaturePropertyControl();
