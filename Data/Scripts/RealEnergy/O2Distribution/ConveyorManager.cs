@@ -66,6 +66,8 @@ namespace TSUT.HeatManagement
         {
             if (o2amount <= 0)
                 return 0f;
+
+            
             var produced = CalculateO2Production(deltaTime);
             var availableProduction = CalculateO2Production(deltaTime) - _productionUsed;
             if (o2amount < availableProduction)

@@ -76,62 +76,6 @@ namespace TSUT.HeatManagement
             _commandsInstance = HeatCommands.Instance; // Initialize commands
         }
 
-        // private static IMyTerminalControlProperty<float> CreateProperty<TBlock>() where TBlock: IMyTerminalBlock
-        // {
-        //     var property =
-        //         MyAPIGateway.TerminalControls.CreateProperty<float, TBlock>("HeatTemperature");
-
-        //     property.Getter = (b) =>
-        //     {
-        //         if (_heatApi == null || _heatApi.Utils == null)
-        //         {
-        //             return 0f;
-        //         }
-        //         return _heatApi.Utils.GetHeat(b);
-        //     };
-
-        //     property.Setter = (b, v) => { }; // read-only
-
-        //     return property;
-        // }
-
-        // private static void TryRegister<T>() where T : IMyTerminalBlock
-        // {
-        //     try
-        //     {
-        //         var prop = CreateProperty<T>();
-        //         if (prop == null)
-        //             return;
-
-        //         MyAPIGateway.TerminalControls.AddControl<T>(prop);
-        //     }
-        //     catch (Exception e)
-        //     {
-        //         MyLog.Default.WriteLine($"[HeatSystem] Failed to register property for {typeof(T).Name}: {e}");
-        //     }
-        // }
-
-        // private static void AddTemperaturePropertyControl()
-        // {
-        //     if (temperaturePropertyCreated)
-        //         return;
-
-        //     temperaturePropertyCreated = true;
-
-        //     TryRegister<IMyBatteryBlock>();
-        //     TryRegister<IMyAirVent>();
-        //     TryRegister<IMyThrust>();
-        // }
-
-        // private static void AddHeatTemperatureProperty(IMyTerminalBlock block, List<IMyTerminalControl> controls)
-        // {
-        //     // Only add if it doesn't already exist
-        //     if (controls.Any(c => c.Id == "HeatTemperature"))
-        //         return;
-
-        //     AddTemperaturePropertyControl();
-        // }
-
         private void OnHeatProviderRegister(object obj)
         {
             Dictionary<string, object> call = obj as Dictionary<string, object>;
@@ -521,7 +465,7 @@ namespace TSUT.HeatManagement
             }
         }
 
-        private static bool IsWheelGrid(IMyCubeGrid grid)
+        public static bool IsWheelGrid(IMyCubeGrid grid)
         {
             var slimBlocks = new List<IMySlimBlock>();
             grid.GetBlocks(slimBlocks);
@@ -536,15 +480,12 @@ namespace TSUT.HeatManagement
             {
                 factory.RegisterCustomControls();
             }
-            // VentHeatManager.RegisterCustomActions();
-            // AddTemperaturePropertyControl();
             if (_initialized)
                 return;
 
             _initialized = true;
 
             MyAPIGateway.TerminalControls.CustomControlGetter += AddShowNetworksControl;
-            // MyAPIGateway.TerminalControls.CustomControlGetter += AddHeatTemperatureProperty;
         }
 
         private static void AddShowNetworksControl(IMyTerminalBlock block, List<IMyTerminalControl> controls)

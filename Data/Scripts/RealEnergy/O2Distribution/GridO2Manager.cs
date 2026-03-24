@@ -11,7 +11,7 @@ using System;
 
 namespace TSUT.HeatManagement
 {
-    [MyEntityComponentDescriptor(typeof(MyObjectBuilder_CubeGrid), false)]
+    [MyEntityComponentDescriptor(typeof(MyObjectBuilder_CubeGrid), true)]
     public class GridO2Manager : MyGameLogicComponent
     {
         private IMyCubeGrid _grid;
@@ -131,6 +131,10 @@ namespace TSUT.HeatManagement
 
         public override void UpdateAfterSimulation()
         {
+            if (HeatSession.IsWheelGrid(Entity as IMyCubeGrid))
+            {
+                return;
+            }
             if (!_isInitialized)
             {
                 Initialize(Entity as IMyCubeGrid);
