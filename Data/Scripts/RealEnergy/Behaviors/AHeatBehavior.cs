@@ -39,6 +39,14 @@ namespace TSUT.HeatManagement
                 var behaviour = HeatSession.GetBehaviorForBlock(neighborFat);
                 var tempDiff = tempOwn - tempNeighbor;
 
+                if (behaviour is IMultiBlockHeatBehavior)
+                {
+                    if (!HeatPipeManagerFactory.IsPipeConnectedToBlock(neighborFat, block))
+                    {
+                        continue;
+                    }
+                }
+
                 var energyTransferred = HeatSession.Api.Utils.GetExchangeUniversal(block, neighborFat, deltaTime); // Get energy transferred in Joules
 
                 energyTransferred = HeatSession.Api.Utils.ApplyExchangeLimit(energyTransferred, capacityOwn, capacityNeighbot, tempDiff);
@@ -49,11 +57,12 @@ namespace TSUT.HeatManagement
 
                 float ambientLoss = 0f;
 
-                if (behaviour == null)
+                if (behaviour == null && !(behaviour is IMultiBlockHeatBehavior))
                 {
-                    // Apply ambient heat exchange for non-vent, non-battery blocks
+                    // Apply ambient heat exchange for non-vent, non-battery blocks, and non-network
                     ambientLoss = HeatSession.Api.Utils.GetAmbientHeatLoss(neighborFat, deltaTime);
                 }
+
 
                 float newTemp = tempNeighbor + deltaNeighbor - ambientLoss;
                 HeatSession.Api.Utils.SetHeat(neighborFat, newTemp);

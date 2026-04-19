@@ -13,6 +13,8 @@ namespace TSUT.HeatManagement
     [ProtoInclude(1003, typeof(RequestHeatConfig))]
     [ProtoInclude(1004, typeof(HeatConfigResponse))]
     [ProtoInclude(1005, typeof(HeatNetworkSyncMessage))]
+    [ProtoInclude(1006, typeof(RequestTempDrop))]
+    [ProtoInclude(1007, typeof(RebuildNetworks))]
 
     [ProtoContract]
     public abstract class PacketBase
@@ -175,6 +177,32 @@ namespace TSUT.HeatManagement
         public override bool Received()
         {
             HeatSession.UpdateHeatConfig(this);
+            return false;
+        }
+    }
+
+    [ProtoContract]
+    public class RequestTempDrop : PacketBase
+    {
+        public RequestTempDrop() { } // Empty constructor required for deserialization
+
+
+        public override bool Received()
+        {
+            HeatSession.DropAllTemperatures();
+            return false;
+        }
+    }
+
+    [ProtoContract]
+    public class RebuildNetworks : PacketBase
+    {
+        public RebuildNetworks() { } // Empty constructor required for deserialization
+
+
+        public override bool Received()
+        {
+            HeatSession.RebuildEverything();
             return false;
         }
     }
