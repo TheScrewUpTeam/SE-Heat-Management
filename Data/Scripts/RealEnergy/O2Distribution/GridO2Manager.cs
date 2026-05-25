@@ -18,6 +18,7 @@ namespace TSUT.HeatManagement
         private readonly Dictionary<IMyCubeBlock, ConveyorManager> blockToManager = new Dictionary<IMyCubeBlock, ConveyorManager>();
         private readonly Dictionary<IMyCubeBlock, IManagedBlock> managedBlocks = new Dictionary<IMyCubeBlock, IManagedBlock>();
         private bool _isInitialized = false;
+        private bool _initialLoadPending = false;
         private int updateCounter = 0;
         private int scheduledProcess = 0;
         private int lastUpdate = 0;
@@ -74,7 +75,8 @@ namespace TSUT.HeatManagement
 
         public override void Init(MyObjectBuilder_EntityBase objectBuilder)
         {
-            NeedsUpdate = MyEntityUpdateEnum.EACH_FRAME;
+            // Commented as caused rover-antigravity problem, works without
+            // NeedsUpdate = MyEntityUpdateEnum.EACH_FRAME;
         }
 
         public override void Close()
@@ -89,6 +91,7 @@ namespace TSUT.HeatManagement
 
             _grid.OnBlockAdded += OnBlockAdded;
             _grid.OnBlockRemoved += OnBlockRemoved;
+            _grid.OnBlockIntegrityChanged += OnBlockChanged;
 
             var terminalSystem = MyAPIGateway.TerminalActionsHelper.GetTerminalSystemForGrid(_grid);
             if (terminalSystem == null)
@@ -123,14 +126,32 @@ namespace TSUT.HeatManagement
             {
                 OnBlockAdded(block.SlimBlock);
             }
+
+            _initialLoadPending = true;
+            scheduledProcess = updateCounter + 180;
             
             _isInitialized = true;
 
             HeatSession.AttachO2GridManager(this, _grid);
         }
 
+        private void OnBlockChanged(IMySlimBlock block)
+        {
+            if (block.FatBlock == null)
+                return;
+            if (block.FatBlock != null && block.FatBlock.IsFunctional)
+            {
+                OnBlockAdded(block);
+            }
+            else
+            {
+                OnBlockRemoved(block);
+            }
+        }
+
         public override void UpdateAfterSimulation()
         {
+            base.UpdateAfterSimulation();
             if (HeatSession.IsWheelGrid(Entity as IMyCubeGrid))
             {
                 return;
@@ -140,7 +161,7 @@ namespace TSUT.HeatManagement
                 Initialize(Entity as IMyCubeGrid);
                 return;
             }
-            if (scheduledProcess > 0 && updateCounter >= scheduledProcess)
+            if (_initialLoadPending && scheduledProcess > 0 && updateCounter >= scheduledProcess)
             {
                 ProcessScheduledBlocks();
                 blocksToProcess.Clear();
@@ -158,10 +179,15 @@ namespace TSUT.HeatManagement
             if (block?.FatBlock == null)
                 return;
 
+            if (!block.FatBlock.IsFunctional)
+                return;
+
             var cubeBlock = block.FatBlock;
             // Processing should be postponed to let the conveyors initialize
-            scheduledProcess = updateCounter + 20;
-            blocksToProcess.Add(cubeBlock);
+            if (!blocksToProcess.Contains(cubeBlock)) {
+                scheduledProcess = Math.Max(updateCounter + 20, scheduledProcess);
+                blocksToProcess.Add(cubeBlock);
+            }
         }
 
         private void ProcessScheduledBlocks()
@@ -183,7 +209,6 @@ namespace TSUT.HeatManagement
                     }
                 }
 
-                // MyAPIGateway.Utilities.ShowMessage("O2Link", $"Adding block: {cubeBlock.DisplayNameText}, Belongs to {connectedManagers.Count} networks");
 
                 if (connectedManagers.Count == 0)
                 {
@@ -191,14 +216,12 @@ namespace TSUT.HeatManagement
                     var newManager = new ConveyorManager(this);
                     newManager.TryAddBlock(cubeBlock);
                     blockToManager[cubeBlock] = newManager;
-                    // MyAPIGateway.Utilities.ShowMessage("O2Link", $" -> New network created, Networks Total: {blockToManager.Values.Distinct().Count()}");
                 }
                 else if (connectedManagers.Count == 1)
                 {
                     // Add to single existing network
                     connectedManagers[0].TryAddBlock(cubeBlock);
                     blockToManager[cubeBlock] = connectedManagers[0];
-                    // MyAPIGateway.Utilities.ShowMessage("O2Link", $" -> Added to existing network, Networks Total: {blockToManager.Values.Distinct().Count()}");
                 }
                 else
                 {
@@ -212,10 +235,8 @@ namespace TSUT.HeatManagement
                     {
                         MergeNetworks(manager, targetManager);
                     }
-                    // MyAPIGateway.Utilities.ShowMessage("O2Link", $" -> merged {connectedManagers.Count} networks, Networks Total: {blockToManager.Values.Distinct().Count()}");
                 }
             }
-            // MyAPIGateway.Utilities.ShowMessage("O2Link", $"Blocks added: {blocksToProcess.Count}, Conveyor Networks: {blockToManager.Values.Distinct().Count()}");
         }
 
         private void OnBlockRemoved(IMySlimBlock block)
@@ -239,7 +260,6 @@ namespace TSUT.HeatManagement
 
             // Check if network needs to be split
             CheckNetworkSplit(oldManager);
-            // MyAPIGateway.Utilities.ShowMessage("O2Link", $"Block removed: {terminalBlock?.CustomName ?? cubeBlock.DisplayNameText}, Conveyor Networks: {blockToManager.Values.Distinct().Count()}");
             ReleaseManagedBlock(cubeBlock);
         }
 
@@ -253,12 +273,9 @@ namespace TSUT.HeatManagement
             // Create a new network for disconnected blocks
             var newManager = new ConveyorManager(this);
 
-            // MyAPIGateway.Utilities.ShowMessage("O2Link", $"Split found. {splitResult.DisconnectedBlocks.Count} blocks disconnected.");
-
             // Move disconnected blocks to the new network
             foreach (var block in splitResult.DisconnectedBlocks)
             {
-                // MyAPIGateway.Utilities.ShowMessage("O2Link", $" -> Moving block: {block.DisplayNameText} to new network.");
                 blockToManager[block] = newManager;
                 newManager.TryAddBlock(block);
                 manager.RemoveBlock(block);

@@ -40,6 +40,13 @@ namespace TSUT.HeatManagement
                 sendToOthers = false; // Prevent the message from being sent to other players
                 return;
             }
+            if (messageText.Equals("/HMS.toggleInspector", StringComparison.OrdinalIgnoreCase))
+            {
+                HeatSession.isInspectorActive = !HeatSession.isInspectorActive;
+                MyAPIGateway.Utilities.ShowMessage("HeatManagement", $"Heat Inspector: {(HeatSession.isInspectorActive ? "Activated" : "Deactivated")}");
+                sendToOthers = false; // Prevent the message from being sent to other players
+                return;
+            }
             sendToOthers = true; // Allow other messages to be sent to other players
         }
 

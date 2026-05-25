@@ -507,20 +507,21 @@ namespace TSUT.HeatManagement
         public float ApplyExchangeLimit(float energyDelta, float capA, float capB, float tempDiff)
         {
             float limit;
-            // Limit energy exchange to half of the temperature difference * thermal capacity of the block
+            // Limit energy exchange to temp difference * thermal capacity of the block (half a difference per update)
             // This prevents over-exchange that would cause unrealistic temperature swings
-            // The division by 2 is a tunable parameter to allow some headroom
+            // The division by 2 is a logic to prevent full energy leak in one tick
 
             // Positive energyDelta means block A is losing heat, negative means gaining heat
             // So we limit based on the block that is losing heat
+
             if (energyDelta > 0)
             {
-                limit = tempDiff * capB / 2;
+                limit = tempDiff * capA / 2;
                 return Math.Min(energyDelta, limit);
             }
             else
             {
-                limit = tempDiff * capA / 2;
+                limit = tempDiff * capB / 2;
                 return Math.Max(energyDelta, limit);
             }
         }
@@ -569,7 +570,7 @@ namespace TSUT.HeatManagement
         {
             float currentHeat = GetHeat(block);
             float newHeat = currentHeat + heatChange;
-            SetHeat(block, currentHeat + heatChange, silent);
+            SetHeat(block, newHeat, silent);
             return newHeat;
         }
 

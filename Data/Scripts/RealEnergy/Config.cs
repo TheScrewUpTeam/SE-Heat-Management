@@ -6,7 +6,7 @@ namespace TSUT.HeatManagement
 {
     public class Config : IConfig
     {
-        public static string Version = "1.2.4";
+        public static string Version = "1.3.3";
         public static ushort HeatSyncMessageId = 7949; // Choose any unused ushort value
 
         public static ushort BlockHeatEventUniqueId = 17949; // Unique ID for block heat events
@@ -18,7 +18,7 @@ namespace TSUT.HeatManagement
 
         public static float ABSOLUTE_ZERO_CELSIUS = -273.15f;
 
-        public string HEAT_SYSTEM_VERSION = "1.2.4";
+        public string HEAT_SYSTEM_VERSION = "1.3.3";
         public bool HEAT_SYSTEM_AUTO_UPDATE = true;
         public float HEAT_COOLDOWN_COEFF { get; set; } = 20f;
         public float HEAT_RADIATION_COEFF { get; set; } = 5f;
@@ -70,6 +70,11 @@ namespace TSUT.HeatManagement
                         contents = reader.ReadToEnd();
                     }
 
+                    if (contents == "")
+                    {
+                         MyLog.Default.WriteLine($"[HeatManagement] The config is empty. First launch?");
+                    }
+
                     // Check if version exists in the XML before deserializing
                     bool hasVersion = contents.Contains("<HEAT_SYSTEM_VERSION>");
 
@@ -95,6 +100,7 @@ namespace TSUT.HeatManagement
                 catch (Exception e)
                 {
                     MyAPIGateway.Utilities.ShowMessage("HeatManagement", $"Failed to load config, using defaults. {e.Message}");
+                    MyLog.Default.WriteLine($"[HeatManagement] Failed to load config, using defaults. {e.Message}");
                 }
             }
 

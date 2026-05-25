@@ -10,6 +10,7 @@ using System.Linq;
 using System;
 using SpaceEngineers.Game.ModAPI;
 using Sandbox.Game.Entities;
+using VRageMath;
 
 
 namespace TSUT.HeatManagement
@@ -24,6 +25,8 @@ namespace TSUT.HeatManagement
         {
             get { return _heatApi; }
         }
+
+        public static bool isInspectorActive;
 
         public static Networking networking = new Networking(Config.HeatSyncMessageId);
 
@@ -247,6 +250,50 @@ namespace TSUT.HeatManagement
             _tickCount++;
         }
 
+        private IMyHudNotification _debugHud;
+        private IMySlimBlock _lastDetected;
+        private float _lastTemp;
+
+        private void DrawDebug()
+        {
+            if (!isInspectorActive)
+                return;
+            if (_debugHud == null)
+                _debugHud = MyAPIGateway.Utilities.CreateNotification("", 1000, "White");
+
+            var cameraPos = MyAPIGateway.Session.Camera.WorldMatrix.Translation;
+            var forward = MyAPIGateway.Session.Camera.WorldMatrix.Forward;
+
+            IHitInfo hit;
+            MyAPIGateway.Physics.CastRay(cameraPos, cameraPos + forward * 50, out hit);
+
+            if (hit?.HitEntity is IMyCubeGrid)
+            {
+                var grid = hit?.HitEntity as IMyCubeGrid;
+                Vector3I cell = grid.WorldToGridInteger(hit.Position);
+                var block = grid.GetCubeBlock(cell);
+
+                if (block != null && block.FatBlock != null)
+                {
+                    float temp = _heatApi.Utils.GetHeat(block.FatBlock);
+
+                    if (temp != _lastTemp || _lastDetected != block) {
+                        _debugHud.Hide();
+                        _debugHud.Text = $"[>HMS<] {block.FatBlock.DisplayNameText}: {temp:F2} °C";
+                        _debugHud.Show();
+                        _lastTemp = temp;
+                        _lastDetected = block;
+                    } else
+                    {
+                        _debugHud.Show();
+                    }
+                }
+            } else
+            {
+                _debugHud.Hide();
+            }
+        }
+
         private void ServerSideUpdates()
         {
             if (_tickCount % Config.MAIN_UPDATE_INTERVAL_TICKS == 0)
@@ -277,6 +324,7 @@ namespace TSUT.HeatManagement
             {
                 manager.UpdateVisuals(MyEngineConstants.UPDATE_STEP_SIZE_IN_SECONDS);
             }
+            DrawDebug();
 
             if (_tickCount % Config.MAIN_UPDATE_INTERVAL_TICKS == 0)
             {
@@ -413,7 +461,7 @@ namespace TSUT.HeatManagement
         {
             if (_gridHeatManagers.TryGetValue(grid, out manager))
                 return true;
-                
+
             return false;
         }
 
@@ -429,6 +477,12 @@ namespace TSUT.HeatManagement
 
         public static void RebuildEverything()
         {
+
+            if (!MyAPIGateway.Multiplayer.IsServer)
+            {
+                networking.SendToServer(new RebuildNetworks());
+                return;
+            }
             lock (_gridHeatManagers)
             {
                 foreach (var manager in _gridHeatManagers.Values)
@@ -456,6 +510,12 @@ namespace TSUT.HeatManagement
 
         public static void DropAllTemperatures()
         {
+            if (!MyAPIGateway.Multiplayer.IsServer)
+            {
+                networking.SendToServer(new RequestTempDrop());
+                return;
+            }
+
             lock (_gridHeatManagers)
             {
                 foreach (var manager in _gridHeatManagers.Values)
@@ -476,7 +536,7 @@ namespace TSUT.HeatManagement
 
         public static void RegisterCustomControls()
         {
-            foreach(var factory in _heatApi.Registry.GetFactories())
+            foreach (var factory in _heatApi.Registry.GetFactories())
             {
                 factory.RegisterCustomControls();
             }

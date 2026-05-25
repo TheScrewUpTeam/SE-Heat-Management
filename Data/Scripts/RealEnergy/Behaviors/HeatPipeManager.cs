@@ -737,8 +737,8 @@ namespace TSUT.HeatManagement
                     if (edge.A != node)
                         continue;
 
-                    float tempA = HeatSession.Api.Utils.GetHeat(edge.A.Block);
-                    float tempB = HeatSession.Api.Utils.GetHeat(edge.B.Block);
+                    float tempA = HeatSession.Api.Utils.GetHeat(edge.A.Block) + _deltaHeat[edge.A.Block];
+                    float tempB = HeatSession.Api.Utils.GetHeat(edge.B.Block) + _deltaHeat[edge.B.Block];
                     float tempDiff = tempB - tempA;
 
                     // Skip negligible temperature differences
@@ -750,15 +750,7 @@ namespace TSUT.HeatManagement
 
                     float energyDelta = tempDiff * edge.Conductance * deltaTime;
 
-                    // Limited to factual energy in the block
-                    if (energyDelta > 0)
-                    {
-                        energyDelta = Math.Min(energyDelta, tempDiff * capB / 2);
-                    }
-                    else
-                    {
-                        energyDelta = Math.Max(energyDelta, tempDiff * capA / 2);
-                    }
+                    energyDelta = HeatSession.Api.Utils.ApplyExchangeLimit(energyDelta, capA, capB, tempDiff);
 
                     // Accumulate changes
                     _deltaHeat[edge.A.Block] += energyDelta / capA;
@@ -820,6 +812,8 @@ namespace TSUT.HeatManagement
             {
                 _currentSegment++;
             }
+
+            // TODO: Debug values
         }
 
         public void Cleanup() => _nodes = null;
