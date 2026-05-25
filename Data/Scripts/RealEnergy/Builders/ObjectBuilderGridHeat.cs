@@ -8,5 +8,6 @@ namespace TSUT.HeatManagement
     [MyObjectBuilderDefinition]
     public class ObjectBuilderGridHeat : MyObjectBuilder_ComponentBase
     {
+        public float Threshold;
     }
 }

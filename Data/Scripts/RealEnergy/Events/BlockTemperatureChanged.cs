@@ -14,7 +14,7 @@ using System;
 namespace TSUT.HeatManagement
 {
     [MyComponentBuilder(typeof(ObjectBuilderHeat))]
-    [MyComponentType(typeof(BlockTemperatureChanged))]
+    [MyComponentType(typeof(ObjectBuilderHeat))]
     [MyEntityDependencyType(typeof(IMyEventControllerBlock))]
     public class BlockTemperatureChanged : MyEventProxyEntityComponent, IMyEventComponentWithGui, IEventControllerEvent
     {
@@ -68,25 +68,33 @@ namespace TSUT.HeatManagement
             HeatSession.Api.Registry.RemoveEventControllerEvent(this);
         }
 
+        // public override MyObjectBuilder_ComponentBase Serialize(bool copy = false)
+        // {
+        //     var builder = new MyObjectBuilder_ModCustomComponent
+        //     {
+        //         ComponentType = nameof(BlockTemperatureChanged),
+        //         CustomModData = _temperatureThreshold.ToString(),
+        //         RemoveExistingComponentOnNewInsert = true,
+        //         SubtypeName = nameof(BlockTemperatureChanged)
+        //     };
+            
+        //     return builder;
+        // }
+
         public override MyObjectBuilder_ComponentBase Serialize(bool copy = false)
         {
-            var builder = new MyObjectBuilder_ModCustomComponent
+            return new ObjectBuilderHeat
             {
-                ComponentType = nameof(BlockTemperatureChanged),
-                CustomModData = _temperatureThreshold.ToString(),
-                RemoveExistingComponentOnNewInsert = true,
-                SubtypeName = nameof(BlockTemperatureChanged)
+                Threshold = _temperatureThreshold
             };
-            
-            return builder;
         }
 
         public override void Deserialize(MyObjectBuilder_ComponentBase builder)
         {
             base.Deserialize(builder);
-            var customBuilder = (MyObjectBuilder_ModCustomComponent)builder;
+            var customBuilder = (ObjectBuilderHeat)builder;
 
-            _temperatureThreshold = float.Parse(customBuilder.CustomModData);
+            _temperatureThreshold = customBuilder.Threshold;
         }
         
         public override bool IsSerialized()
