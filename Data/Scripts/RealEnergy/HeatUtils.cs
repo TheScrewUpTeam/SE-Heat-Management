@@ -514,7 +514,7 @@ namespace TSUT.HeatManagement
             // Positive energyDelta means block A is losing heat, negative means gaining heat
             // So we limit based on the block that is losing heat
 
-            if (energyDelta > 0)
+            if (energyDelta >= 0)
             {
                 limit = tempDiff * capA / 2;
                 return Math.Min(energyDelta, limit);

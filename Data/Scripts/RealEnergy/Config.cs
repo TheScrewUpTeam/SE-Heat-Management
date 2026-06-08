@@ -14,6 +14,9 @@ namespace TSUT.HeatManagement
 
         public static readonly Guid O2TurboKey = new Guid("decafbad-0000-4c00-babe-c0ffee000002");
 
+        public static readonly Guid BlockHeatThresholdKey = new Guid("decafbad-0001-4c00-babe-c0ffee000001");
+        public static readonly Guid GridHeatThresholdKey  = new Guid("decafbad-0001-4c00-babe-c0ffee000002");
+
         public static string HeatDebugString = "HeatDebug";
 
         public static float ABSOLUTE_ZERO_CELSIUS = -273.15f;

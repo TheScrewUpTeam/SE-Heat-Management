@@ -44,7 +44,6 @@ namespace TSUT.HeatManagement
 
         private HeatCommands _commandsInstance;
         public static HeatSession Instance { get; private set; }
-        static bool temperaturePropertyCreated = false;
 
         public static void AttachO2GridManager(GridO2Manager manager, IMyCubeGrid grid)
         {
@@ -226,13 +225,9 @@ namespace TSUT.HeatManagement
         private void OnBlockAdded(IMySlimBlock block)
         {
             if (block.FatBlock == null)
-            {
                 return;
-            }
             if (block.FatBlock is IMyTerminalBlock)
-            {
                 OnAnyBlockOwnershipChanged(block.FatBlock as IMyTerminalBlock);
-            }
         }
 
         private void OnAnyBlockOwnershipChanged(IMyTerminalBlock block)
