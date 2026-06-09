@@ -779,7 +779,7 @@ namespace TSUT.HeatManagement
             // Calculate which nodes to process this tick
             int totalSegments = _nodes.Count / segmentSize;
             int nodesPerSegment = (_nodes.Count + totalSegments - 1) / totalSegments;
-            int startIdx = _currentSegment * nodesPerSegment + 1;
+            int startIdx = _currentSegment * nodesPerSegment;
             int endIdx = Math.Min(startIdx + nodesPerSegment, _nodes.Count);
             
             var segmentNodes = _nodes.Skip(startIdx).Take(endIdx - startIdx);
