@@ -1,24 +1,90 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.Serialization.Formatters;
 using System.Text;
+using Sandbox.Common.ObjectBuilders;
 using Sandbox.Game;
 using Sandbox.Game.EntityComponents;
 using Sandbox.ModAPI;
 using Sandbox.ModAPI.Interfaces.Terminal;
 using SpaceEngineers.Game.ModAPI;
 using VRage.Game;
+using VRage.Game.Components;
 using VRage.Game.ModAPI;
+using VRage.ModAPI;
+using VRage.ObjectBuilders;
 using VRage.Utils;
 
 namespace TSUT.HeatManagement
 {
+    [MyEntityComponentDescriptor(typeof(MyObjectBuilder_AirVent), false)]
+    public class VentGameLogic : MyGameLogicComponent
+    {
+        public override void Init(MyObjectBuilder_EntityBase objectBuilder)
+        {
+            NeedsUpdate |= MyEntityUpdateEnum.BEFORE_NEXT_FRAME;
+        }
+
+        public override void UpdateOnceBeforeFrame()
+        {
+            VentTerminalControls.Register();
+        }
+    }
+
+    public static class VentTerminalControls
+    {
+        static bool _registered = false;
+
+        public static void Register()
+        {
+            if (_registered) return;
+            _registered = true;
+
+            HeatSession.Api.Utils.TryRegister<IMyAirVent>();
+
+            var slider = MyAPIGateway.TerminalControls.CreateControl<IMyTerminalControlSlider, IMyAirVent>("O2Turbo");
+            slider.Title = MyStringId.GetOrCompute("Turbo mode");
+            slider.Tooltip = MyStringId.GetOrCompute("Select O2 usage for cooling");
+            slider.SetLimits(b => 0f, b => VentHeatManager.GetO2TurboMax(b));
+            slider.SupportsMultipleBlocks = false;
+            slider.Enabled = b => !(b as IMyAirVent).CanPressurize;
+            slider.Writer = (b, sb) => sb.Append($"{VentHeatManager.GetO2Turbo(b):F2} L/s");
+            slider.Getter = b => VentHeatManager.GetO2Turbo(b);
+            slider.Setter = (b, value) => VentHeatManager.SetO2Turbo(b, value);
+            MyAPIGateway.TerminalControls.AddControl<IMyAirVent>(slider);
+
+            var turboIncrease = MyAPIGateway.TerminalControls.CreateAction<IMyAirVent>("O2TurboIncrease");
+            turboIncrease.Name = new StringBuilder("Increase O2 Usage For Cooling");
+            turboIncrease.Enabled = b => !(b as IMyAirVent).CanPressurize;
+            turboIncrease.Icon = @"Textures\GUI\Icons\Actions\Increase.dds";
+            turboIncrease.Action = b =>
+            {
+                var limit = VentHeatManager.GetO2TurboMax(b);
+                float step = limit / 10f;
+                float newValue = VentHeatManager.GetO2Turbo(b) + step;
+                if (newValue > limit) newValue = limit;
+                VentHeatManager.SetO2Turbo(b, newValue);
+            };
+            turboIncrease.Writer = (b, sb) => sb.Append($"{VentHeatManager.GetO2Turbo(b):F2}L/s");
+            MyAPIGateway.TerminalControls.AddAction<IMyAirVent>(turboIncrease);
+
+            var turboDecrease = MyAPIGateway.TerminalControls.CreateAction<IMyAirVent>("O2TurboDecrease");
+            turboDecrease.Name = new StringBuilder("Decrease O2 Usage For Cooling");
+            turboDecrease.Enabled = b => !(b as IMyAirVent).CanPressurize;
+            turboDecrease.Icon = @"Textures\GUI\Icons\Actions\Decrease.dds";
+            turboDecrease.Action = b =>
+            {
+                float step = VentHeatManager.GetO2TurboMax(b) / 10f;
+                float newValue = VentHeatManager.GetO2Turbo(b) - step;
+                if (newValue < 0f) newValue = 0f;
+                VentHeatManager.SetO2Turbo(b, newValue);
+            };
+            turboDecrease.Writer = (b, sb) => sb.Append($"{VentHeatManager.GetO2Turbo(b):F2}L/s");
+            MyAPIGateway.TerminalControls.AddAction<IMyAirVent>(turboDecrease);
+        }
+    }
+
     public class VentHeatManagerFactory : IHeatBehaviorFactory
     {
-        private static bool _controlsInitialized = false;
-        private static bool _propertyAdded = false;
-
         public void CollectHeatBehaviors(IMyCubeGrid grid, IGridHeatManager manager, IDictionary<IMyCubeBlock, IHeatBehavior> behaviorMap)
         {
             List<IMyAirVent> vents = new List<IMyAirVent>();
@@ -43,90 +109,16 @@ namespace TSUT.HeatManagement
                 result.Behavior = new VentHeatManager(block as IMyAirVent, manager);
                 return result;
             }
-            return result; // No behavior created for non-vent blocks
+            return result;
         }
 
-        public void RegisterCustomControls()
-        {
-            RegisterIncreaseControl();
-            RegisterDecreaseControl();
-            if (_controlsInitialized)
-                return;
+        public void RegisterCustomControls() { }
 
-            MyAPIGateway.TerminalControls.CustomControlGetter += (block, controls) =>
-            {
-                // if (!(block is IMyAirVent))
-                //     return;
-
-                // Only add if it doesn't already exist
-                if (controls.Any(c => c.Id == "HeatTemperature") || _propertyAdded)
-                    return;
-
-                _propertyAdded = true;
-
-                HeatSession.Api.Utils.TryRegister<IMyAirVent>();
-            };
-
-            _controlsInitialized = true;
-        }
-
-        private void RegisterDecreaseControl()
-        {
-            var turboSelectorDecr = MyAPIGateway.TerminalControls.CreateAction<IMyAirVent>("O2TurboDecrease");
-            turboSelectorDecr.Name = new StringBuilder("Decrease O2 Usage For Cooling");
-            turboSelectorDecr.Enabled = b => !(b as IMyAirVent).CanPressurize;
-            turboSelectorDecr.Icon = @"Textures\GUI\Icons\Actions\Decrease.dds";
-            turboSelectorDecr.Action = b =>
-            {
-                float current = VentHeatManager.GetO2Turbo(b);
-                float step = VentHeatManager.GetO2TurboMax(b) / 10f;
-                float newValue = current - step;
-                if (newValue < 0f)
-                {
-                    newValue = 0;
-                }
-                VentHeatManager.SetO2Turbo(b, newValue);
-            };
-            turboSelectorDecr.Writer = (b, sb) =>
-            {
-                sb.Append($"{VentHeatManager.GetO2Turbo(b):F2}L/s");
-            };
-            // controls.Add(turboSelectorDecr);
-            MyAPIGateway.TerminalControls.AddAction<IMyAirVent>(turboSelectorDecr);
-        }
-
-        private void RegisterIncreaseControl()
-        {
-            var turboSelectorIncr = MyAPIGateway.TerminalControls.CreateAction<IMyAirVent>("O2TurboIncrease");
-            turboSelectorIncr.Name = new StringBuilder("Increase O2 Usage For Cooling");
-            turboSelectorIncr.Enabled = b => !(b as IMyAirVent).CanPressurize;
-            turboSelectorIncr.Icon = @"Textures\GUI\Icons\Actions\Increase.dds";
-            turboSelectorIncr.Action = b =>
-            {
-                var limit = VentHeatManager.GetO2TurboMax(b);
-                float current = VentHeatManager.GetO2Turbo(b);
-                float step = limit / 10f;
-                float newValue = current + step;
-                if (newValue > limit)
-                {
-                    newValue = limit;
-                }
-                VentHeatManager.SetO2Turbo(b, newValue);
-            };
-            turboSelectorIncr.Writer = (b, sb) =>
-            {
-                sb.Append($"{VentHeatManager.GetO2Turbo(b):F2}L/s");
-            };
-            // controls.Add(turboSelectorIncr);
-            MyAPIGateway.TerminalControls.AddAction<IMyAirVent>(turboSelectorIncr);
-        }
-
-        public int Priority => 20; // Vents are less critical than batteries
+        public int Priority => 20;
     }
 
     public class VentHeatManager : AHeatBehavior
     {
-        private static bool _controlsInitialized = false;
         private IGridHeatManager _gridManager;
         private IMyAirVent _vent;
 
@@ -137,7 +129,6 @@ namespace TSUT.HeatManagement
             _vent = vent;
             _gridManager = manager;
             _vent.AppendingCustomInfo += AppendVentHeatInfo;
-            MyAPIGateway.TerminalControls.CustomControlGetter += OnCustomControlGetter;
         }
 
         public static void SetO2Turbo(IMyCubeBlock block, float o2turbo)
@@ -148,18 +139,14 @@ namespace TSUT.HeatManagement
         public static float GetO2Turbo(IMyCubeBlock block)
         {
             if ((block as IMyAirVent).CanPressurize)
-            {
                 return 0f;
-            }
 
             string turboStr;
             if (block.Storage.TryGetValue(Config.O2TurboKey, out turboStr))
             {
                 float heat;
                 if (float.TryParse(turboStr, out heat) && !float.IsNaN(heat) && !float.IsInfinity(heat))
-                {
                     return heat;
-                }
             }
 
             return 0f;
@@ -168,91 +155,6 @@ namespace TSUT.HeatManagement
         public static float GetO2TurboMax(IMyTerminalBlock block)
         {
             return block.CubeGrid.GridSizeEnum == MyCubeSize.Large ? 500f : 50f;
-        }
-
-        private void OnCustomControlGetter(IMyTerminalBlock block, List<IMyTerminalControl> controls)
-        {
-            if (block != _vent)
-                return;
-
-            var slider = MyAPIGateway.TerminalControls.CreateControl<IMyTerminalControlSlider, IMyAirVent>("O2Turbo");
-            slider.Title = MyStringId.GetOrCompute("Turbo mode");
-            slider.Tooltip = MyStringId.GetOrCompute("Select O2 usage for cooling");
-            slider.SetLimits(0, GetO2TurboMax(block));
-            slider.SupportsMultipleBlocks = false;
-            slider.Enabled = b => !(b as IMyAirVent).CanPressurize;
-            slider.Writer = (b, sb) =>
-            {
-                if (b == _vent)
-                {
-                    sb.Append($"{GetO2Turbo(b):F2} L/s");
-                }
-            };
-
-            slider.Setter = (b, value) =>
-            {
-                SetO2Turbo(b, value);
-            };
-
-            slider.Getter = (b) =>
-            {
-                return GetO2Turbo(b);
-            };
-
-            controls.Add(slider);
-        }
-
-        public static void RegisterCustomActions()
-        {
-            if (_controlsInitialized)
-                return;
-
-            // MyAPIGateway.Utilities.ShowMessage("HeatManagement", $"RegisterCustomActions called");
-
-            var turboSelectorIncr = MyAPIGateway.TerminalControls.CreateAction<IMyAirVent>("O2TurboIncrease");
-            turboSelectorIncr.Name = new StringBuilder("Increase O2 Usage For Cooling");
-            turboSelectorIncr.Enabled = b => !(b as IMyAirVent).CanPressurize;
-            turboSelectorIncr.Icon = @"Textures\GUI\Icons\Actions\Increase.dds";
-            turboSelectorIncr.Action = b =>
-            {
-                var limit = GetO2TurboMax(b);
-                float current = GetO2Turbo(b);
-                float step = limit / 10f;
-                float newValue = current + step;
-                if (newValue > limit)
-                {
-                    newValue = limit;
-                }
-                SetO2Turbo(b, newValue);
-            };
-            turboSelectorIncr.Writer = (b, sb) =>
-            {
-                sb.Append($"{GetO2Turbo(b):F2}L/s");
-            };
-            MyAPIGateway.TerminalControls.AddAction<IMyAirVent>(turboSelectorIncr);
-
-            var turboSelectorDecr = MyAPIGateway.TerminalControls.CreateAction<IMyAirVent>("O2TurboDecrease");
-            turboSelectorDecr.Name = new StringBuilder("Decrease O2 Usage For Cooling");
-            turboSelectorDecr.Enabled = b => !(b as IMyAirVent).CanPressurize;
-            turboSelectorDecr.Icon = @"Textures\GUI\Icons\Actions\Decrease.dds";
-            turboSelectorDecr.Action = b =>
-            {
-                float current = GetO2Turbo(b);
-                float step = GetO2TurboMax(b) / 10f;
-                float newValue = current - step;
-                if (newValue < 0f)
-                {
-                    newValue = 0;
-                }
-                SetO2Turbo(b, newValue);
-            };
-            turboSelectorDecr.Writer = (b, sb) =>
-            {
-                sb.Append($"{GetO2Turbo(b):F2}L/s");
-            };
-            MyAPIGateway.TerminalControls.AddAction<IMyAirVent>(turboSelectorDecr);
-
-            _controlsInitialized = true;
         }
 
         private void AppendVentHeatInfo(IMyTerminalBlock block, StringBuilder builder)
@@ -274,7 +176,7 @@ namespace TSUT.HeatManagement
                 o2Exchange = turboO2Usage * Config.Instance.VENT_TURBO_COOLING_RATE / ownThermalCapacity;
             }
 
-            float heatChange = -GetAmbientExchange(1f) - cumulativeNeighborHeatChange - cumulativeNetworkHeatChange - o2Exchange; // Assuming deltaTime of 1 second for display purposes
+            float heatChange = -GetAmbientExchange(1f) - cumulativeNeighborHeatChange - cumulativeNetworkHeatChange - o2Exchange;
 
             builder.AppendLine($"--- Heat Management ---");
             builder.AppendLine($"Temperature: {HeatSession.Api.Utils.GetHeat(block):F2} °C");
@@ -282,8 +184,8 @@ namespace TSUT.HeatManagement
             builder.AppendLine($"Thermal Status: {heatStatus}");
             builder.AppendLine($"Net Heat Change: {heatChange:+0.00;-0.00;0.00} °C/s");
             string exchangeMode = _vent.IsWorking
-            ? (turboO2Usage > 0 && supplyGranted ? "Turbo" : "Active")
-            : "Passive";
+                ? (turboO2Usage > 0 && supplyGranted ? "Turbo" : "Active")
+                : "Passive";
             builder.AppendLine($"Exchange Mode: {exchangeMode}");
             builder.AppendLine($"Thermal Capacity: {ownThermalCapacity / 1000000:F1} MJ/°C");
             builder.AppendLine($"Ambient temp: {HeatSession.Api.Utils.CalculateAmbientTemperature(block):F1} °C");
@@ -353,7 +255,6 @@ namespace TSUT.HeatManagement
                 HeatSession.Api.Effects.RemoveSmoke(_vent);
                 _vent = null;
             }
-            MyAPIGateway.TerminalControls.CustomControlGetter -= OnCustomControlGetter;
         }
 
         public override void SpreadHeat(float deltaTime)
@@ -365,20 +266,16 @@ namespace TSUT.HeatManagement
         {
             HeatSession.Api.Effects.UpdateBlockHeatLight(_vent, heat);
             _vent.RefreshCustomInfo();
-            return;
         }
 
-        // IO2Consumer implementation
         public float GetO2Consumption(float deltaTime)
         {
             if (_vent == null || !_vent.IsWorking || _vent.CanPressurize)
                 return 0f;
 
-            float turboO2Usage = GetO2Turbo(_vent);
-            return turboO2Usage * deltaTime;
+            return GetO2Turbo(_vent) * deltaTime;
         }
 
-        // IO2Producer implementation
         public float GetO2Production(float deltaTime)
         {
             if (_vent == null || !_vent.IsWorking || !_vent.Depressurize)
@@ -429,9 +326,8 @@ namespace TSUT.HeatManagement
             foreach (IMyGasTank tank in tanks)
             {
                 if (tank.FilledRatio == 0)
-                {
                     continue;
-                }
+
                 double currentVolume = tank.Capacity * tank.FilledRatio;
 
                 if (currentVolume < shouldBeConsumed)
