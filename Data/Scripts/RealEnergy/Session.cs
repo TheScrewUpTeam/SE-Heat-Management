@@ -119,7 +119,6 @@ namespace TSUT.HeatManagement
             _commandsInstance?.Unload();
             networking?.Unregister();
             MyAPIGateway.Utilities.UnregisterMessageHandler(HmsApi.HeatProviderMesageId, OnHeatProviderRegister);
-            MyAPIGateway.TerminalControls.CustomControlGetter -= AddShowNetworksControl;
         }
 
         public override void BeforeStart()
@@ -540,39 +539,6 @@ namespace TSUT.HeatManagement
 
             _initialized = true;
 
-            MyAPIGateway.TerminalControls.CustomControlGetter += AddShowNetworksControl;
-        }
-
-        private static void AddShowNetworksControl(IMyTerminalBlock block, List<IMyTerminalControl> controls)
-        {
-            if (!(block is IMyBatteryBlock))
-                return;
-
-            // Only add if it doesn't already exist
-            if (controls.Any(c => c.Id == "ShowHeatNetworks"))
-                return;
-
-            var checkbox = MyAPIGateway.TerminalControls.CreateControl<IMyTerminalControlCheckbox, IMyBatteryBlock>("ShowHeatNetworks");
-            checkbox.Title = MyStringId.GetOrCompute("Show Heat Networks");
-            checkbox.Tooltip = MyStringId.GetOrCompute("Visualizes all heat pipe connections on this grid.");
-            checkbox.SupportsMultipleBlocks = false;
-
-            checkbox.Getter = b =>
-            {
-                GridHeatManager gridManager;
-                if (_gridHeatManagers.TryGetValue(b.CubeGrid, out gridManager))
-                    return gridManager.GetShowDebug();
-                return false;
-            };
-
-            checkbox.Setter = (b, value) =>
-            {
-                GridHeatManager gridManager;
-                if (_gridHeatManagers.TryGetValue(b.CubeGrid, out gridManager))
-                    gridManager.SetShowDebug(value);
-            };
-
-            controls.Add(checkbox);
         }
 
         private Dictionary<string, object> ConvertApiToShareable(HeatApi heatApi)

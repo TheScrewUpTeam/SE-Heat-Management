@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Text;
 using Sandbox.Definitions;
 using Sandbox.ModAPI;
@@ -14,8 +12,6 @@ namespace TSUT.HeatManagement
 {
     public class BatteryHeatManagerFactory : IHeatBehaviorFactory
     {
-        private static bool _propertyAdded = false;
-
         public void CollectHeatBehaviors(IMyCubeGrid grid, IGridHeatManager manager, IDictionary<IMyCubeBlock, IHeatBehavior> behaviorMap)
         {
             List<IMyBatteryBlock> batteries = new List<IMyBatteryBlock>();
@@ -43,21 +39,7 @@ namespace TSUT.HeatManagement
             return result; // No behavior created for non-battery blocks
         }
 
-        public void RegisterCustomControls()
-        {
-            MyAPIGateway.TerminalControls.CustomControlGetter += (block, controls) =>
-            {
-                // if (!(block is IMyBatteryBlock))
-                //     return;
-                // Only add if it doesn't already exist
-                if (controls.Any(c => c.Id == "HeatTemperature") || _propertyAdded)
-                    return;
-                
-                _propertyAdded = true;
-
-                HeatSession.Api.Utils.TryRegister<IMyBatteryBlock>();
-            };
-        }
+        public void RegisterCustomControls() { }
 
         public int Priority => 10; // Batteries first, since they are critical for heat management
     }
