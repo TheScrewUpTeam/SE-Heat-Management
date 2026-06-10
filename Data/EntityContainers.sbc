@@ -48,7 +48,7 @@
     When entity types are changed to be GameLogic components in container, these definitions may remain same and the TypeId can be used to create component of that type.
     
     -->
-        
+
         <Container>
             <Id>
                 <TypeId>EventControllerBlock</TypeId>

@@ -1,4 +1,4 @@
-using Sandbox.Game.EntityComponents; // Example base namespace
+using Sandbox.Game.EntityComponents;
 using VRage.Game.Components;
 using Sandbox.ModAPI;
 using VRage.Utils;
@@ -58,19 +58,6 @@ namespace TSUT.HeatManagement
             HeatSession.Api.Registry.RemoveEventControllerEvent(this);
         }
 
-        // public override MyObjectBuilder_ComponentBase Serialize(bool copy = false)
-        // {
-        //     var builder = new MyObjectBuilder_ModCustomComponent
-        //     {
-        //         ComponentType = nameof(GridMaxTemperatureChanged),
-        //         CustomModData = _temperatureThreshold.ToString(),
-        //         RemoveExistingComponentOnNewInsert = true,
-        //         SubtypeName = nameof(GridMaxTemperatureChanged)
-        //     };
-            
-        //     return builder;
-        // }
-
         public override MyObjectBuilder_ComponentBase Serialize(bool copy = false)
         {
             return new ObjectBuilderGridHeat
@@ -86,10 +73,10 @@ namespace TSUT.HeatManagement
 
             _temperatureThreshold = customBuilder.Threshold;
         }
-        
+
         public override bool IsSerialized()
         {
-            return true;
+            return false;
         }
 
         public void AddBlocks(List<IMyTerminalBlock> blocks)
@@ -99,14 +86,16 @@ namespace TSUT.HeatManagement
         public void CreateTerminalInterfaceControls<T>() where T : IMyTerminalBlock
         {
             var sliderBox =
-                MyAPIGateway.TerminalControls.CreateControl<IMyTerminalControlSlider, T>("HeatThresholdReachedEvent.TemperatureThreshold");
-            sliderBox.Visible = b => b.Components.Get<GridMaxTemperatureChanged>().IsSelected;
+                MyAPIGateway.TerminalControls.CreateControl<IMyTerminalControlSlider, T>("HeatMgmt.GridTempThreshold");
+            sliderBox.Visible = b => { var c = b.Components.Get<GridMaxTemperatureChanged>(); return c != null && c.IsSelected; };
             sliderBox.SetLimits(-1000, 1000);
             sliderBox.Getter = b => b.Components.Get<GridMaxTemperatureChanged>()._temperatureThreshold;
             sliderBox.Setter = (b, value) =>
             {
-                b.Components.Get<GridMaxTemperatureChanged>()._temperatureThreshold = value;
-                b.Components.Get<GridMaxTemperatureChanged>().NotifyValuesChanged();
+                var c = b.Components.Get<GridMaxTemperatureChanged>();
+                c._temperatureThreshold = value;
+                c.SaveThreshold();
+                c.NotifyValuesChanged();
                 NotifyServer(b.EntityId, value);
             };
             sliderBox.Title = MyStringId.GetOrCompute("Threshold");
@@ -187,12 +176,26 @@ namespace TSUT.HeatManagement
             EventController.SetDetailedInfoDirty();
         }
 
+        public void LoadThreshold()
+        {
+            string val;
+            if (Entity.Storage != null && Entity.Storage.TryGetValue(Config.GridHeatThresholdKey, out val))
+                float.TryParse(val, out _temperatureThreshold);
+        }
+
+        private void SaveThreshold()
+        {
+            if (Entity.Storage != null)
+                Entity.Storage[Config.GridHeatThresholdKey] = _temperatureThreshold.ToString();
+        }
+
         public void UpdateSettings(long entityId, float treshholdValue)
         {
             if (entityId != EventController.EntityId)
                 return;
 
             _temperatureThreshold = treshholdValue;
+            SaveThreshold();
             NotifyValuesChanged();
         }
 

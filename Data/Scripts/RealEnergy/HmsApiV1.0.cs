@@ -530,12 +530,12 @@ namespace TSUT.HeatManagement
                     {
                         neighborNetworks.Add(neighborFat, transfer / capacity);
                         neighborNetworkData.Add(neighborFat, (HeatNetworkData)netwrorkData);
-                        networkCumulative = -transfer / ownCapacity;
+                        networkCumulative += -transfer / ownCapacity;
                     }
                     else
                     {
                         neighborBlocks.Add(neighborFat, transfer / capacity);
-                        neighborCumulative = -transfer / ownCapacity;
+                        neighborCumulative += -transfer / ownCapacity;
                     }
                     energyTransferred -= transfer;
                 }
