@@ -13,7 +13,7 @@ using System;
 namespace TSUT.HeatManagement
 {
     [MyComponentBuilder(typeof(ObjectBuilderHeat))]
-    [MyComponentType(typeof(BlockTemperatureChanged))]
+    [MyComponentType(typeof(ObjectBuilderHeat))]
     [MyEntityDependencyType(typeof(IMyEventControllerBlock))]
     public class BlockTemperatureChanged : MyEventProxyEntityComponent, IMyEventComponentWithGui, IEventControllerEvent
     {
@@ -69,12 +69,18 @@ namespace TSUT.HeatManagement
 
         public override MyObjectBuilder_ComponentBase Serialize(bool copy = false)
         {
-            return new ObjectBuilderHeat();
+            return new ObjectBuilderHeat
+            {
+                Threshold = _temperatureThreshold
+            };
         }
 
         public override void Deserialize(MyObjectBuilder_ComponentBase builder)
         {
             base.Deserialize(builder);
+            var customBuilder = (ObjectBuilderHeat)builder;
+
+            _temperatureThreshold = customBuilder.Threshold;
         }
 
         public override bool IsSerialized()

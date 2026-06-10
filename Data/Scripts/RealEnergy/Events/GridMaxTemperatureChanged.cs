@@ -12,7 +12,7 @@ using VRage.Game.ObjectBuilders.ComponentSystem;
 namespace TSUT.HeatManagement
 {
     [MyComponentBuilder(typeof(ObjectBuilderGridHeat))]
-    [MyComponentType(typeof(GridMaxTemperatureChanged))]
+    [MyComponentType(typeof(ObjectBuilderGridHeat))]
     [MyEntityDependencyType(typeof(IMyEventControllerBlock))]
     public class GridMaxTemperatureChanged : MyEventProxyEntityComponent, IMyEventComponentWithGui, IEventControllerEvent
     {
@@ -58,14 +58,33 @@ namespace TSUT.HeatManagement
             HeatSession.Api.Registry.RemoveEventControllerEvent(this);
         }
 
+        // public override MyObjectBuilder_ComponentBase Serialize(bool copy = false)
+        // {
+        //     var builder = new MyObjectBuilder_ModCustomComponent
+        //     {
+        //         ComponentType = nameof(GridMaxTemperatureChanged),
+        //         CustomModData = _temperatureThreshold.ToString(),
+        //         RemoveExistingComponentOnNewInsert = true,
+        //         SubtypeName = nameof(GridMaxTemperatureChanged)
+        //     };
+            
+        //     return builder;
+        // }
+
         public override MyObjectBuilder_ComponentBase Serialize(bool copy = false)
         {
-            return new ObjectBuilderGridHeat();
+            return new ObjectBuilderGridHeat
+            {
+                Threshold = _temperatureThreshold
+            };
         }
 
         public override void Deserialize(MyObjectBuilder_ComponentBase builder)
         {
             base.Deserialize(builder);
+            var customBuilder = (ObjectBuilderGridHeat)builder;
+
+            _temperatureThreshold = customBuilder.Threshold;
         }
 
         public override bool IsSerialized()
