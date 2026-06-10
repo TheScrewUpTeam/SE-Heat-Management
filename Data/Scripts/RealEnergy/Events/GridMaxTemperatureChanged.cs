@@ -58,19 +58,6 @@ namespace TSUT.HeatManagement
             HeatSession.Api.Registry.RemoveEventControllerEvent(this);
         }
 
-        // public override MyObjectBuilder_ComponentBase Serialize(bool copy = false)
-        // {
-        //     var builder = new MyObjectBuilder_ModCustomComponent
-        //     {
-        //         ComponentType = nameof(GridMaxTemperatureChanged),
-        //         CustomModData = _temperatureThreshold.ToString(),
-        //         RemoveExistingComponentOnNewInsert = true,
-        //         SubtypeName = nameof(GridMaxTemperatureChanged)
-        //     };
-            
-        //     return builder;
-        // }
-
         public override MyObjectBuilder_ComponentBase Serialize(bool copy = false)
         {
             return new ObjectBuilderGridHeat
