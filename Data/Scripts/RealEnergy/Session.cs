@@ -63,7 +63,6 @@ namespace TSUT.HeatManagement
 
             _heatApi.Registry.RegisterHeatBehaviorFactory(new VentHeatManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new ExhaustHeatManagerFactory());
-            _heatApi.Registry.RegisterHeatBehaviorFactory(new ThrusterHeatManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new HeatPipeManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new HeatVentManagerFactory());
 

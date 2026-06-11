@@ -179,7 +179,7 @@ Merging a new grid into an existing grid causes the merged grid's blocks (observ
 
 ---
 
-## Phase 5 — Thruster
+## Phase 5 — Thruster ✓ DONE
 
 ### Files changed
 - `NEW: Data/Scripts/RealEnergy/Behaviors/ThrusterHeatComponent.cs`
@@ -193,9 +193,9 @@ Merging a new grid into an existing grid causes the merged grid's blocks (observ
 4. Remove `ThrusterHeatManagerFactory`
 
 ### Test criteria
-- [ ] Atmospheric thrusters heat under thrust
-- [ ] Ion/hydrogen thrusters: no heat behavior registered
-- [ ] Placed mid-game works
+- [x] Atmospheric thrusters heat under thrust
+- [x] Ion/hydrogen thrusters: no heat behavior registered
+- [x] Placed mid-game works
 
 ---
 
