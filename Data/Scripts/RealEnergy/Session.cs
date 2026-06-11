@@ -66,8 +66,6 @@ namespace TSUT.HeatManagement
             _heatApi.Registry.RegisterHeatBehaviorFactory(new ThrusterHeatManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new HeatPipeManagerFactory());
             _heatApi.Registry.RegisterHeatBehaviorFactory(new HeatVentManagerFactory());
-            _heatApi.Registry.RegisterHeatBehaviorFactory(new RotorHeatManagerFactory());
-            _heatApi.Registry.RegisterHeatBehaviorFactory(new PistonHeatManagerFactory());
 
             MyAPIGateway.Utilities.RegisterMessageHandler(HmsApi.HeatProviderMesageId, OnHeatProviderRegister);
             var shareable = ConvertApiToShareable(_heatApi);

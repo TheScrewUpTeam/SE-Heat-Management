@@ -156,20 +156,26 @@ with a grid-level `GridHeatComponent` replacing the manually managed `GridHeatMa
 
 ---
 
-## Phase 4 — Rotor + Piston
+## Phase 4 — Rotor + Piston ✓ DONE
 
 Two separate commits.
 
 ### Rotor
-- `[MyEntityComponentDescriptor(typeof(MyObjectBuilder_MotorRotor), false)]`
-- (also `MyObjectBuilder_MotorAdvancedRotor` if covered — verify against current factory)
+- `[MyEntityComponentDescriptor(typeof(MyObjectBuilder_MotorRotor), false)]` + `MyObjectBuilder_MotorAdvancedRotor` shim
+- `[MyEntityComponentDescriptor(typeof(MyObjectBuilder_MotorStator), false)]` + `MyObjectBuilder_MotorAdvancedStator` shim
+- Rotor head is **passive** (`GetHeatChange` only returns `_lastHeatChange`) — stator drives both sides
 
 ### Piston
-- `[MyEntityComponentDescriptor(typeof(MyObjectBuilder_PistonBase), false)]`
+- `[MyEntityComponentDescriptor(typeof(MyObjectBuilder_PistonBase), false)]` + `MyObjectBuilder_ExtendedPistonBase` shim
+- `[MyEntityComponentDescriptor(typeof(MyObjectBuilder_PistonTop), false)]`
+- Piston top is **passive** — same reason as rotor head
 
 ### Test criteria (each)
-- [ ] Moving part heats under load
-- [ ] Placed mid-game works
+- [x] Moving part heats under load
+- [x] Placed mid-game works
+
+### Known issue (deferred): Grid merge loses block component
+Merging a new grid into an existing grid causes the merged grid's blocks (observed: battery) to lose their `MyGameLogicComponent`. Heat data disappears from detailed info. Root cause unknown — needs investigation. Fix deferred to post-Phase-7 cleanup or dedicated phase.
 
 ---
 
