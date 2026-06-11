@@ -199,20 +199,22 @@ Merging a new grid into an existing grid causes the merged grid's blocks (observ
 
 ---
 
-## Phase 6 — Vent
+## Phase 6 — Vent ✓ DONE
 
 **Note:** `VentGameLogic : MyGameLogicComponent` already exists in `VentHeatManager.cs`. Expand it.
 
 ### Files changed
-- `MODIFY: Data/Scripts/RealEnergy/Behaviors/VentHeatManager.cs`
+- `NEW: Data/Scripts/RealEnergy/Behaviors/VentHeatComponent.cs`
+- `MODIFY: Data/Scripts/RealEnergy/Behaviors/VentHeatManager.cs` (gutted to empty stub)
 - `MODIFY: Session.cs` (remove factory)
 
 ### Steps
 1. Rename `VentGameLogic` → `VentHeatComponent`, extend `AHeatGameLogicComponent`
 2. Absorb `VentHeatManager` logic into the component
-3. `_gridManager` reference → use `_gridHeatComponent` (obtained in base `UpdateOnceBeforeFrame()`)
-4. `VentTerminalControls.Register()` still called from `UpdateOnceBeforeFrame()`
+3. Absorb `VentTerminalControls` into component as private static method
+4. `_gridManager` reference → use `_gridHeatComponent` (obtained in base `UpdateOnceBeforeFrame()`)
 5. Remove `VentHeatManagerFactory`
+6. Drop dead O2 tank-walking methods (`FindConnectedO2Tanks`, `GetO2Available`, `ConsumeO2`) — O2 goes through `GridO2Manager`
 
 ### Important: O2Turbo setting
 - `block.Storage[Config.O2TurboKey]` stores player-configured L/s value
@@ -220,11 +222,11 @@ Merging a new grid into an existing grid causes the merged grid's blocks (observ
 - `GetO2Turbo()` / `SetO2Turbo()` static methods: unchanged
 
 ### Test criteria
-- [ ] Vent passive cooling works
-- [ ] Vent active cooling (working=true) works
-- [ ] Turbo mode: O2 consumed, steam effect shown
-- [ ] O2Turbo setting persists across save/load
-- [ ] Terminal controls (slider, actions) appear and function
+- [x] Vent passive cooling works
+- [x] Vent active cooling (working=true) works
+- [ ] Turbo mode: O2 consumed, steam effect shown — **pre-existing bug, deferred to Phase 11**
+- [x] O2Turbo setting persists across save/load
+- [x] Terminal controls (slider, actions) appear and function
 
 ---
 
@@ -306,6 +308,30 @@ Remove dead code from `Session.cs`:
 
 ---
 
+## Phase 11 — O2 Distribution System
+
+**Context:** Turbo mode O2 consumption broken pre-refactor. `GridO2Manager` / `ConsumeO2` path doesn't actually drain tanks correctly. Needs dedicated investigation and fix.
+
+### Investigation targets
+- `GridO2Manager.ConsumeO2()` — trace actual execution, verify it reaches tank drain
+- `GridO2Manager.HasEnoughO2()` — verify O2 availability check is correct
+- Conveyor connectivity: confirm `GridO2Manager` finds tanks connected to the vent
+- O2 unit mismatch: L/s vs game internal units — verify `VENT_TURBO_COOLING_RATE` scaling
+- Steam effect: `HeatSession.Api.Effects.InstantiateSteam()` — check condition path in `VentHeatComponent.GetHeatChange()`
+
+### Files likely changed
+- `Data/Scripts/RealEnergy/GridO2Manager.cs`
+- `Data/Scripts/RealEnergy/Config.cs` (if rate constant wrong)
+- `Data/Scripts/RealEnergy/Behaviors/VentHeatComponent.cs` (if condition logic wrong)
+
+### Test criteria
+- [ ] Turbo mode: O2 tanks drain at configured L/s rate
+- [ ] Steam effect appears when O2 consumed
+- [ ] Warning shown when O2 unavailable
+- [ ] No O2 drain when vent not working or turbo set to 0
+
+---
+
 ## Rollback Table
 
 | Phase | Rollback |
@@ -316,6 +342,7 @@ Remove dead code from `Session.cs`:
 | 8 | N/A (nothing changed) |
 | 9 | N/A |
 | 10 | `git revert` the cleanup commit |
+| 11 | `git revert` the O2 fix commit |
 
 ---
 
