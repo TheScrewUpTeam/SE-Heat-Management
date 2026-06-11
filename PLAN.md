@@ -89,7 +89,7 @@ with a grid-level `GridHeatComponent` replacing the manually managed `GridHeatMa
 
 ---
 
-## Phase 1 — Block Component Foundation: AHeatGameLogicComponent
+## Phase 1 — Block Component Foundation: AHeatGameLogicComponent ✓ DONE
 
 **Goal:** Create base class. Nothing uses it yet.
 
@@ -109,7 +109,7 @@ with a grid-level `GridHeatComponent` replacing the manually managed `GridHeatMa
 6. `IMyCubeBlock Block => (IMyCubeBlock)Entity`
 
 ### Test criteria
-- [ ] Mod loads, no errors, zero behavior change
+- [x] Mod loads, no errors, zero behavior change
 
 ---
 
