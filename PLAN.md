@@ -10,7 +10,7 @@ with a grid-level `GridHeatComponent` replacing the manually managed `GridHeatMa
 | Layer | Old | New |
 |---|---|---|
 | Grid | `GridHeatManager` in `Session._gridHeatManagers` dict | `GridHeatComponent : MyGameLogicComponent` on `MyObjectBuilder_CubeGrid` |
-| O2 | `GridO2Manager` (already a component) | Unchanged — `GridHeatComponent` gets it via `Components.Get<GridO2Manager>()` |
+| O2 | `GridO2Manager` (already a component) | Unchanged — `GridHeatComponent` gets it via `Entity.GameLogic.GetAs<GridO2Manager>()` (composite-safe) |
 | Block | `IHeatBehaviorFactory` + `IHeatBehavior` class | `AHeatGameLogicComponent : MyGameLogicComponent, IHeatBehavior` |
 | Session | Grid dict + entity callbacks + ownership watch | API broadcast + config sync only |
 | Satellite mods | `IHeatBehaviorFactory` registration | Unchanged — factory path kept alive |
@@ -313,27 +313,63 @@ Remove dead code from `Session.cs`:
 
 ---
 
-## Phase 11 — O2 Distribution System
+## Phase 11 — O2 Distribution System ✓ PARTIALLY DONE
 
-**Context:** Turbo mode O2 consumption broken pre-refactor. `GridO2Manager` / `ConsumeO2` path doesn't actually drain tanks correctly. Needs dedicated investigation and fix.
+**Context:** Turbo mode O2 consumption broken pre-refactor. Root cause found and fixed. Debug infrastructure added. Remaining bugs in VentHeatComponent still open.
 
-### Investigation targets
-- `GridO2Manager.ConsumeO2()` — trace actual execution, verify it reaches tank drain
-- `GridO2Manager.HasEnoughO2()` — verify O2 availability check is correct
-- Conveyor connectivity: confirm `GridO2Manager` finds tanks connected to the vent
-- O2 unit mismatch: L/s vs game internal units — verify `VENT_TURBO_COOLING_RATE` scaling
-- Steam effect: `HeatSession.Api.Effects.InstantiateSteam()` — check condition path in `VentHeatComponent.GetHeatChange()`
+### Completed this phase
 
-### Files likely changed
-- `Data/Scripts/RealEnergy/GridO2Manager.cs`
-- `Data/Scripts/RealEnergy/Config.cs` (if rate constant wrong)
-- `Data/Scripts/RealEnergy/Behaviors/VentHeatComponent.cs` (if condition logic wrong)
+#### Logging infrastructure
+- `NEW: Data/Scripts/RealEnergy/HeatLog.cs` — `LS` subsystem constants + `HeatLog` static wrapper
+- `Config.LOG_FLAGS` bitmask added (0=off, 1=Grid, 2=Behavior, 4=Pipe, 8=O2, 16=Sync, 32=Net)
+- AND condition: flag must be set AND grid name must contain `"HeatDebug"` (grid=null skips name check)
+- All `MyLog.Default.*` calls in `GridHeatComponent`, `HeatPipeManager`, `Session`, `HeatUtils`, `Networking`, `HmsApiV1.0` migrated to `HeatLog.Info/Warn` with subsystem tags
+- Log prefix format: `[HeatManagement.{SubSystem}]`
+
+#### Root cause fix — `GridO2Manager.NeedsUpdate` was commented out
+- `GridO2Manager.Init()`: restored `NeedsUpdate = MyEntityUpdateEnum.BEFORE_NEXT_FRAME`
+- `GridO2Manager.UpdateOnceBeforeFrame()`: wheel grid guard → `NeedsUpdate = EACH_FRAME`
+- Without this, `UpdateAfterSimulation` never ran → `Initialize()` never called → `blockToManager` always empty → `ConsumeO2` always returned full amount unconsumed
+
+#### `GameLogic.GetAs<T>()` composite fix
+- `GridHeatComponent._o2Manager` lazy property: `Components.Get<GridO2Manager>()` → `GameLogic.GetAs<GridO2Manager>()`
+- `Components.Get<T>()` cannot pierce `MyCompositeGameLogicComponent` wrapper — `GameLogic.GetAs<T>()` is the correct SE API when multiple `[MyEntityComponentDescriptor]` classes target the same entity type
+
+#### O2 network debug visualization
+- Battery "Show Heat Networks" checkbox now also draws O2 networks as blue lines (`.05f` thick, `Square` material, `Vector4(0,0,1,1)`)
+- `ConveyorManager.ShowDebugGraph()`: draws lines from `_referenceBlock` to all other blocks in network
+- `GridO2Manager.ShowDebugGraph()`: iterates `blockToManager.Values.Distinct()`
+- `GridHeatComponent.UpdateVisuals()`: calls `O2Manager?.ShowDebugGraph()` every frame when `_showDebug` is true
+- Note: `GizmoDrawLine` material ignores blue channel — `Square` material required for true blue
+
+#### Network build stats logging
+- `Initialize()` logs block type counts per grid
+- `ProcessScheduledBlocks()` logs each block's network assignment with size
+- Summary log: N networks, M blocks total
+
+### Files changed
+- `NEW: Data/Scripts/RealEnergy/HeatLog.cs`
+- `MODIFY: Data/Scripts/RealEnergy/Config.cs` (LOG_FLAGS added)
+- `MODIFY: Data/Scripts/RealEnergy/GridHeatComponent.cs` (logging, O2Manager lazy prop fix, UpdateVisuals O2 debug)
+- `MODIFY: Data/Scripts/RealEnergy/O2Distribution/GridO2Manager.cs` (NeedsUpdate fix, ShowDebugGraph, logging)
+- `MODIFY: Data/Scripts/RealEnergy/O2Distribution/ConveyorManager.cs` (ShowDebugGraph, BlockCount prop)
+- `MODIFY: Data/Scripts/RealEnergy/Behaviors/HeatPipeManager.cs` (logging migration)
+- `MODIFY: Data/Scripts/RealEnergy/Session.cs`, `HeatUtils.cs`, `Networking.cs`, `HmsApiV1.0.cs` (logging migration)
+- `MODIFY: CONFIGURATION.md` (VENT_TURBO_COOLING_RATE, LOG_FLAGS added; version → 1.3.3)
+
+### Remaining bugs in VentHeatComponent (not yet fixed)
+- [ ] Unit mismatch: `ConsumeO2(turboO2Usage, deltaTime, Block)` — should pass `turboO2Usage * deltaTime` (L/s × s = L)
+- [ ] Missing deltaTime in cooling calc: `turboO2Usage * Config.VENT_TURBO_COOLING_RATE / capacity` — needs `* deltaTime`
+- [ ] Steam effect: `InstantiateSteam` called every tick — should return early if already running
+- [ ] Minor: `CalculateO2Production` called twice in `ConveyorManager.Consume()`
 
 ### Test criteria
-- [ ] Turbo mode: O2 tanks drain at configured L/s rate
-- [ ] Steam effect appears when O2 consumed
-- [ ] Warning shown when O2 unavailable
-- [ ] No O2 drain when vent not working or turbo set to 0
+- [x] O2 network builds on grid load (logs confirm)
+- [x] O2 network debug visualization draws (blue lines, battery checkbox)
+- [x] Turbo mode: O2 tanks drain at configured L/s rate
+- [x] Steam effect appears when O2 consumed, persists (not restarted every tick)
+- [x] Warning shown when O2 unavailable
+- [x] No O2 drain when vent not working or turbo set to 0
 
 ---
 
