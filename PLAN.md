@@ -230,7 +230,7 @@ Merging a new grid into an existing grid causes the merged grid's blocks (observ
 
 ---
 
-## Phase 7 — Exhaust + HeatVent
+## Phase 7 — Exhaust + HeatVent ✓ DONE
 
 Two separate commits, same pattern as Phase 6.
 
@@ -243,8 +243,8 @@ Two separate commits, same pattern as Phase 6.
 - Port `HeatVentManager`
 
 ### Test criteria (each)
-- [ ] Heat rejection at correct rates
-- [ ] Effects (steam/smoke) correct
+- [x] Heat rejection at correct rates
+- [x] Effects (steam/smoke) correct
 
 ---
 
