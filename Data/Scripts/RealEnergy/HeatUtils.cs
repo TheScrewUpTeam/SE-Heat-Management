@@ -639,7 +639,7 @@ namespace TSUT.HeatManagement
             }
             catch (Exception e)
             {
-                MyLog.Default.WriteLine($"[HeatSystem] Failed to register property for {typeof(T).Name}: {e}");
+                HeatLog.Warn($"Failed to register property for {typeof(T).Name}: {e}", LS.Behavior);
             }
         }
     }

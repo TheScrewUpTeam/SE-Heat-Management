@@ -155,7 +155,7 @@ namespace TSUT.HeatManagement
             if (!_o2FirstUpdateLogged)
             {
                 _o2FirstUpdateLogged = true;
-                MyLog.Default.WriteLine("[HeatManagement] GridO2Manager.UpdateAfterSimulation reached");
+                HeatLog.Info("UpdateAfterSimulation reached.", LS.O2);
             }
             base.UpdateAfterSimulation();
             if (HeatSession.IsWheelGrid(Entity as IMyCubeGrid))

@@ -56,12 +56,12 @@ namespace TSUT.HeatManagement
             // Load config (will use defaults if file doesn't exist)
             Config = Config.Instance;
             Instance = this;
-            MyLog.Default.WriteLine($"[HeatManagement] HeatSession instance created.");
+            HeatLog.Info("HeatSession instance created.", LS.Grid);
 
             MyAPIGateway.Utilities.RegisterMessageHandler(HmsApi.HeatProviderMesageId, OnHeatProviderRegister);
             var shareable = ConvertApiToShareable(_heatApi);
             MyAPIGateway.Utilities.SendModMessage(HmsApi.HeatApiMessageId, shareable);
-            MyLog.Default.WriteLine($"[HeatManagement] HeatAPI populated");
+            HeatLog.Info("HeatAPI populated.", LS.Grid);
             _commandsInstance = HeatCommands.Instance; // Initialize commands
         }
 
@@ -108,7 +108,7 @@ namespace TSUT.HeatManagement
         {
             var shareable = ConvertApiToShareable(_heatApi);
             MyAPIGateway.Utilities.SendModMessage(HmsApi.HeatApiMessageId, shareable);
-            MyLog.Default.WriteLine($"[HeatManagement] HeatAPI populated late");
+            HeatLog.Info("HeatAPI populated late.", LS.Grid);
             networking.Register();
             RegisterCustomControls();
 
@@ -242,21 +242,21 @@ namespace TSUT.HeatManagement
         {
             try
             {
-                MyLog.Default.WriteLine($"[HeatManagement] Received network heat update for grid {gridId} with {heats.Count} entries.");
+                HeatLog.Info($"Received network heat update for grid {gridId} with {heats.Count} entries.", LS.Sync);
                 var grid = MyAPIGateway.Entities.GetEntityById(gridId) as IMyCubeGrid;
                 if (grid == null)
                 {
-                    MyLog.Default.WriteLine($"[HeatManagement] Could not find grid with ID {gridId}.");
+                    HeatLog.Warn($"Could not find grid with ID {gridId}.", LS.Sync);
                     return;
                 }
                 GridHeatComponent component;
                 _gridComponentCache.TryGetValue(grid.EntityId, out component);
                 if (component == null)
                 {
-                    MyLog.Default.WriteLine($"[HeatManagement] No GridHeatComponent on grid {grid.DisplayName}.");
+                    HeatLog.Warn($"No GridHeatComponent on grid {grid.DisplayName}.", LS.Sync);
                     return;
                 }
-                MyLog.Default.WriteLine($"[HeatManagement] Found grid {grid.DisplayName}.");
+                HeatLog.Info($"Found grid {grid.DisplayName}.", LS.Sync);
                 foreach (var heatPair in heats)
                 {
                     var block = MyAPIGateway.Entities.GetEntityById(heatPair.BlockId) as IMyCubeBlock;
@@ -264,11 +264,11 @@ namespace TSUT.HeatManagement
                     _heatApi.Utils.SetHeat(block, heatPair.Heat, true);
                     component.TryReactOnHeat(block, heatPair.Heat);
                 }
-                MyLog.Default.WriteLine($"[HeatManagement] Updated {heats.Count} blocks.");
+                HeatLog.Info($"Updated {heats.Count} blocks.", LS.Sync);
             }
             catch (Exception e)
             {
-                MyLog.Default.WriteLine($"[HeatManagement] Exception in UpdateNetowkrsUI: {e}");
+                HeatLog.Warn($"Exception in UpdateNetowkrsUI: {e}", LS.Sync);
             }
         }
 

@@ -768,7 +768,7 @@ namespace TSUT.HeatManagement
                     var fn = (Func<long, long, float, float>)method;
                     return fn(block?.EntityId ?? 0, neighbor?.EntityId ?? 0, deltaTime);
                 }
-                MyLog.Default.Warning($"[H2Real] No method GetExchangeWithNeighbor found {client.Count}");
+                HeatLog.Warn($"No method GetExchangeWithNeighbor found {client.Count}", LS.Net);
                 return 0f;
             }
 
