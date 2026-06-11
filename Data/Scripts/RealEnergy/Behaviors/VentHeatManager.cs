@@ -121,6 +121,7 @@ namespace TSUT.HeatManagement
     {
         private IGridHeatManager _gridManager;
         private IMyAirVent _vent;
+        private MyResourceSourceComponent _sourceComp;
 
         public override IMyCubeBlock Block => _vent;
 
@@ -128,6 +129,7 @@ namespace TSUT.HeatManagement
         {
             _vent = vent;
             _gridManager = manager;
+            _sourceComp = vent.Components.Get<MyResourceSourceComponent>();
             _vent.AppendingCustomInfo += AppendVentHeatInfo;
         }
 
@@ -281,11 +283,10 @@ namespace TSUT.HeatManagement
             if (_vent == null || !_vent.IsWorking || !_vent.Depressurize)
                 return 0f;
 
-            var sourceComp = _vent.Components.Get<MyResourceSourceComponent>();
-            if (sourceComp != null)
+            if (_sourceComp != null)
             {
                 var resourceId = MyResourceDistributorComponent.OxygenId;
-                return sourceComp.CurrentOutputByType(resourceId) * deltaTime;
+                return _sourceComp.CurrentOutputByType(resourceId) * deltaTime;
             }
             return 0f;
         }

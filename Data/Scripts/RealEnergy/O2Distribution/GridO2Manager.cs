@@ -1,4 +1,5 @@
 using Sandbox.ModAPI;
+using VRage.Utils;
 using System.Collections.Generic;
 using VRage.Game.ModAPI;
 using System.Linq;
@@ -18,6 +19,7 @@ namespace TSUT.HeatManagement
         private readonly Dictionary<IMyCubeBlock, ConveyorManager> blockToManager = new Dictionary<IMyCubeBlock, ConveyorManager>();
         private readonly Dictionary<IMyCubeBlock, IManagedBlock> managedBlocks = new Dictionary<IMyCubeBlock, IManagedBlock>();
         private bool _isInitialized = false;
+        private bool _o2FirstUpdateLogged = false;
         private bool _initialLoadPending = false;
         private int updateCounter = 0;
         private int scheduledProcess = 0;
@@ -151,6 +153,11 @@ namespace TSUT.HeatManagement
 
         public override void UpdateAfterSimulation()
         {
+            if (!_o2FirstUpdateLogged)
+            {
+                _o2FirstUpdateLogged = true;
+                MyLog.Default.WriteLine("[HeatManagement] GridO2Manager.UpdateAfterSimulation reached");
+            }
             base.UpdateAfterSimulation();
             if (HeatSession.IsWheelGrid(Entity as IMyCubeGrid))
             {

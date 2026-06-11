@@ -40,14 +40,14 @@ namespace TSUT.HeatManagement
             checkbox.SupportsMultipleBlocks = false;
             checkbox.Getter = b =>
             {
-                GridHeatManager gridManager;
+                GridHeatComponent gridManager;
                 if (HeatSession.TryGetGridHeatManager(b.CubeGrid, out gridManager))
                     return gridManager.GetShowDebug();
                 return false;
             };
             checkbox.Setter = (b, value) =>
             {
-                GridHeatManager gridManager;
+                GridHeatComponent gridManager;
                 if (HeatSession.TryGetGridHeatManager(b.CubeGrid, out gridManager))
                     gridManager.SetShowDebug(value);
             };

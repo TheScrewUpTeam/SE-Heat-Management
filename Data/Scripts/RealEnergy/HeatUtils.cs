@@ -587,7 +587,7 @@ namespace TSUT.HeatManagement
 
         public float ConsumeO2(float amount, float deltaTime, IMyCubeBlock block)
         {
-            GridHeatManager manager;
+            GridHeatComponent manager;
             if (!HeatSession.TryGetGridHeatManager(block.CubeGrid, out manager))
                 return amount;
 
@@ -596,7 +596,7 @@ namespace TSUT.HeatManagement
 
         public bool HasEnoughO2(float amount, float deltaTime, IMyCubeBlock block)
         {
-            GridHeatManager manager;
+            GridHeatComponent manager;
             if (!HeatSession.TryGetGridHeatManager(block.CubeGrid, out manager))
             {
                 return false;
@@ -609,6 +609,9 @@ namespace TSUT.HeatManagement
         {
             var property =
                 MyAPIGateway.TerminalControls.CreateProperty<float, TBlock>("HeatTemperature");
+
+            if (property == null)
+                return null;
 
             property.Getter = (b) =>
             {

@@ -39,7 +39,7 @@ namespace TSUT.HeatManagement
             if (existing != null)
                 return result;
 
-            GridHeatManager oppositeGrid = null;
+            GridHeatComponent oppositeGrid = null;
             if (block is IMyMotorStator && (block as IMyMotorStator).Top != null)
             {
                 var grid = (block as IMyMotorStator).Top.CubeGrid;

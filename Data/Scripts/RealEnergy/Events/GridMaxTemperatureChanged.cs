@@ -128,7 +128,7 @@ namespace TSUT.HeatManagement
             float threshold = _temperatureThreshold;
             bool isBelow = EventController.IsLowerOrEqualCondition;
             IMyCubeGrid grid = EventController.CubeGrid;
-            GridHeatManager gridHeatManager;
+            GridHeatComponent gridHeatManager;
             HeatSession.GetGridHeatManager(grid, out gridHeatManager);
 
             bool result;
@@ -166,7 +166,7 @@ namespace TSUT.HeatManagement
             info.AppendFormat(MyTexts.GetString(MySpaceTexts.EventThresholdInfo), treshholdValue, "°C");
             info.AppendLine();
             IMyCubeGrid grid = EventController.CubeGrid;
-            GridHeatManager gridHeatManager;
+            GridHeatComponent gridHeatManager;
             HeatSession.GetGridHeatManager(grid, out gridHeatManager);
             var num = gridHeatManager.GetMaxTemperature();
             var blockInput = num.ToString("F1");
