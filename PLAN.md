@@ -113,7 +113,7 @@ with a grid-level `GridHeatComponent` replacing the manually managed `GridHeatMa
 
 ---
 
-## Phase 2 — Battery
+## Phase 2 — Battery ✓ DONE
 
 **Goal:** Merge `BatteryGameLogic` + `BatteryHeatManager` → single component.
 
@@ -132,10 +132,10 @@ with a grid-level `GridHeatComponent` replacing the manually managed `GridHeatMa
 5. Remove `BatteryHeatManagerFactory` from `Session.LoadData()` factory registrations
 
 ### Test criteria
-- [ ] Battery charges/discharges with correct heat
-- [ ] Terminal controls (heat property) appear
-- [ ] Placed mid-game heats up correctly
-- [ ] Existing save: heat value preserved (reads from `block.Storage` GUID — no change)
+- [x] Battery charges/discharges with correct heat
+- [x] Terminal controls (heat property) appear
+- [x] Placed mid-game heats up correctly
+- [x] Existing save: heat value preserved (reads from `block.Storage` GUID — no change)
 
 ---
 

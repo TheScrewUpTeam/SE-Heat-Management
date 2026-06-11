@@ -142,12 +142,16 @@ namespace TSUT.HeatManagement
         private void Deactivate()
         {
             _active = false;
+            var toRemove = new List<IMyCubeBlock>();
             foreach (var kvp in _heatBehaviors)
             {
+                if (kvp.Value is AHeatGameLogicComponent) continue;
                 try { kvp.Value.Cleanup(); }
                 catch (Exception ex) { MyLog.Default.Warning($"[HeatManagement] Behavior cleanup on deactivate: {ex}"); }
+                toRemove.Add(kvp.Key);
             }
-            _heatBehaviors.Clear();
+            foreach (var key in toRemove)
+                _heatBehaviors.Remove(key);
             MyLog.Default.WriteLine($"[HeatManagement] GridHeatComponent deactivated for {_grid?.DisplayName}");
         }
 

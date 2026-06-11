@@ -1,28 +1,10 @@
-using Sandbox.Common.ObjectBuilders;
 using Sandbox.ModAPI;
 using Sandbox.ModAPI.Interfaces.Terminal;
-using VRage.Game.Components;
 using VRage.Game.ModAPI;
-using VRage.ModAPI;
-using VRage.ObjectBuilders;
 using VRage.Utils;
 
 namespace TSUT.HeatManagement
 {
-    [MyEntityComponentDescriptor(typeof(MyObjectBuilder_BatteryBlock), false)]
-    public class BatteryGameLogic : MyGameLogicComponent
-    {
-        public override void Init(MyObjectBuilder_EntityBase objectBuilder)
-        {
-            NeedsUpdate |= MyEntityUpdateEnum.BEFORE_NEXT_FRAME;
-        }
-
-        public override void UpdateOnceBeforeFrame()
-        {
-            BatteryTerminalControls.Register();
-        }
-    }
-
     public static class BatteryTerminalControls
     {
         static bool _registered = false;
