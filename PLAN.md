@@ -24,7 +24,7 @@ with a grid-level `GridHeatComponent` replacing the manually managed `GridHeatMa
 
 ---
 
-## Phase 0 — Grid Foundation: GridHeatComponent
+## Phase 0 — Grid Foundation: GridHeatComponent ✓ DONE
 
 **Goal:** Replace `GridHeatManager` + Session dict with a self-managing grid-level component.
 
@@ -76,14 +76,16 @@ with a grid-level `GridHeatComponent` replacing the manually managed `GridHeatMa
    - `private void CollectExistingBehaviors()` — on (re)activation, scans for already-existing block components
 
 ### Test criteria
-- [ ] Game loads, grids heat normally
-- [ ] `LIMIT_TO_PLAYER_GRIDS = false` (default): all grids active
-- [ ] `LIMIT_TO_PLAYER_GRIDS = true`: NPC grids inactive (no heat updates, no CPU cost)
-- [ ] Capture NPC grid → heat activates within one tick
-- [ ] Lose grid to NPC → heat deactivates
-- [ ] Grid merge / split works (SE calls component lifecycle)
-- [ ] `TryGetHeatBehaviour()` returns correct behaviors
-- [ ] Pipe networks still work (factory path)
+- [x] Game loads, grids heat normally
+- [x] `LIMIT_TO_PLAYER_GRIDS = false` (default): all grids active
+- [x] `LIMIT_TO_PLAYER_GRIDS = true`: NPC grids inactive (no heat updates, no CPU cost)
+- [x] Capture NPC grid → heat activates within one tick
+- [x] Lose grid to NPC → heat deactivates
+- [x] Grid merge / split works (SE calls component lifecycle)
+- [x] `TryGetHeatBehaviour()` returns correct behaviors
+- [x] Pipe networks still work (factory path)
+
+**Known deferred issue:** Event controller threshold sliders missing. `BeforeGameLogicInit` → `CreateTerminalControls` fires before `EventControllerBlockLogic.Init()` adds the components → `CreateTerminalInterfaceControls` never called. Affects both `BlockTemperatureChanged` and `GridMaxTemperatureChanged`. Fix deferred to post-refactor.
 
 ---
 
