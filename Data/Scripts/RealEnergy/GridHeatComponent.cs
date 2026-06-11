@@ -27,6 +27,7 @@ namespace TSUT.HeatManagement
         private bool _active = false;
         private bool _isInitialized = false;
         private GridO2Manager _o2Manager = null;
+        private GridO2Manager O2Manager => _o2Manager ?? (_o2Manager = Entity?.GameLogic.GetAs<GridO2Manager>());
 
         // ===== SE component lifecycle =====
 
@@ -78,7 +79,7 @@ namespace TSUT.HeatManagement
             SubscribeToOwnershipChanges();
             EvaluateActive();
 
-            _o2Manager = Entity?.Components.Get<GridO2Manager>();
+            _o2Manager = Entity?.GameLogic.GetAs<GridO2Manager>();
             HeatSession.RegisterGridComponent(grid.EntityId, this);
             _isInitialized = true;
             HeatLog.Info($"GridHeatComponent initialized for {grid.DisplayName} ({grid.EntityId}). Active: {_active}", LS.Grid, grid);
@@ -533,6 +534,7 @@ namespace TSUT.HeatManagement
                 if (behavior is IMultiBlockHeatBehavior)
                     (behavior as IMultiBlockHeatBehavior).ShowDebugGraph(deltaTime);
             }
+            O2Manager?.ShowDebugGraph();
         }
 
         public bool TryReactOnHeat(IMyCubeBlock block, float heat)
@@ -583,12 +585,12 @@ namespace TSUT.HeatManagement
 
         public float ConsumeO2(float amount, float deltaTime, IMyCubeBlock block)
         {
-            return _o2Manager != null ? _o2Manager.ConsumeO2(amount, deltaTime, block) : amount;
+            return O2Manager != null ? O2Manager.ConsumeO2(amount, deltaTime, block) : amount;
         }
 
         public bool HasEnoughO2(float amount, float deltaTime, IMyCubeBlock block)
         {
-            return _o2Manager != null && _o2Manager.HasEnoughO2(amount, deltaTime, block);
+            return O2Manager != null && O2Manager.HasEnoughO2(amount, deltaTime, block);
         }
 
         // ===== Phase 1+ registration entry points =====

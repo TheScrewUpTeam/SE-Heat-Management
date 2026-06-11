@@ -35,9 +35,11 @@ namespace TSUT.HeatManagement
         private static bool Active(int sub, IMyCubeGrid grid = null)
         {
             int flags = Config.Instance?.LOG_FLAGS ?? 0;
-            if (flags == 0) return false;
-            return (flags & sub) != 0 || (grid != null && grid.CustomName.Contains(Config.HeatDebugString));
+            if ((flags & sub) == 0) return false;
+            return grid == null || grid.CustomName.Contains(Config.HeatDebugString);
         }
+
+        public static bool IsActive(int sub, IMyCubeGrid grid = null) => Active(sub, grid);
 
         public static void Info(string msg, int sub, IMyCubeGrid grid = null)
         { if (Active(sub, grid)) MyLog.Default.WriteLine($"{Prefix(sub)} {msg}"); }
