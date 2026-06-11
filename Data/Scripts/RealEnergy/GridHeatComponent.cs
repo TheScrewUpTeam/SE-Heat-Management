@@ -17,6 +17,7 @@ namespace TSUT.HeatManagement
     {
         private IMyCubeGrid _grid;
         private readonly Dictionary<IMyCubeBlock, IHeatBehavior> _heatBehaviors = new Dictionary<IMyCubeBlock, IHeatBehavior>();
+        private readonly List<HeatPipeManager> _pipeNetworks = new List<HeatPipeManager>();
         private readonly HashSet<IMyTerminalBlock> _ownershipSubscribedBlocks = new HashSet<IMyTerminalBlock>();
         private bool _showDebug = false;
         private int _blockCallCount = 0;
@@ -146,12 +147,21 @@ namespace TSUT.HeatManagement
             foreach (var kvp in _heatBehaviors)
             {
                 if (kvp.Value is AHeatGameLogicComponent) continue;
-                try { kvp.Value.Cleanup(); }
-                catch (Exception ex) { MyLog.Default.Warning($"[HeatManagement] Behavior cleanup on deactivate: {ex}"); }
+                if (!(kvp.Value is HeatPipeManager))
+                {
+                    try { kvp.Value.Cleanup(); }
+                    catch (Exception ex) { MyLog.Default.Warning($"[HeatManagement] Behavior cleanup on deactivate: {ex}"); }
+                }
                 toRemove.Add(kvp.Key);
             }
             foreach (var key in toRemove)
                 _heatBehaviors.Remove(key);
+            foreach (var mgr in _pipeNetworks)
+            {
+                try { mgr.Cleanup(); }
+                catch (Exception ex) { MyLog.Default.Warning($"[HeatManagement] PipeManager cleanup on deactivate: {ex}"); }
+            }
+            _pipeNetworks.Clear();
             MyLog.Default.WriteLine($"[HeatManagement] GridHeatComponent deactivated for {_grid?.DisplayName}");
         }
 
@@ -188,6 +198,8 @@ namespace TSUT.HeatManagement
                 catch (Exception ex) { MyLog.Default.Warning($"[HeatManagement] Provider threw on collect: {ex}"); }
             }
 
+            CollectPipeNetworks();
+
             var foreignBlocks = new List<IMyCubeBlock>();
             foreach (var b in _heatBehaviors.Keys)
                 if (b.CubeGrid != _grid) foreignBlocks.Add(b);
@@ -198,6 +210,140 @@ namespace TSUT.HeatManagement
             }
 
             MyLog.Default.WriteLine($"[HeatManagement] CollectBehaviors done: total behaviors={_heatBehaviors.Count} (+{_heatBehaviors.Count - before}), foreign removed={foreignBlocks.Count}");
+        }
+
+        // ===== Pipe network management =====
+
+        private void CollectPipeNetworks()
+        {
+            var slimBlocks = new List<IMySlimBlock>();
+            _grid.GetBlocks(slimBlocks);
+
+            var pipeBlocks = slimBlocks
+                .Where(s => s.FatBlock != null && HeatPipeManagerFactory.IsPipeCandidate(s.FatBlock))
+                .Select(s => s.FatBlock)
+                .ToList();
+
+            if (_grid.CustomName.Contains(Config.HeatDebugString))
+                MyLog.Default.WriteLine($"[HeatManagement] CollectPipeNetworks: {pipeBlocks.Count} pipe blocks on {_grid.DisplayName}");
+
+            foreach (var pipe in pipeBlocks)
+            {
+                if (_heatBehaviors.ContainsKey(pipe)) continue;
+                OnPipeBlockAdded(pipe);
+            }
+
+            if (_grid.CustomName.Contains(Config.HeatDebugString))
+                MyLog.Default.WriteLine($"[HeatManagement] CollectPipeNetworks: {_pipeNetworks.Count} networks created");
+        }
+
+        private void OnPipeBlockAdded(IMyCubeBlock block)
+        {
+            bool debug = _grid.CustomName.Contains(Config.HeatDebugString);
+            if (debug)
+                MyLog.Default.WriteLine($"[HeatManagement] OnPipeBlockAdded: {block.BlockDefinition.SubtypeName} at {block.Position}, networks={_pipeNetworks.Count}");
+
+            var connectedManagers = new List<HeatPipeManager>();
+            var neighborNodes = new Dictionary<HeatPipeNode, HeatPipeManager>();
+            var connectedNeighbors = HeatPipeManagerFactory.GetConnectedBlocks(block);
+
+            if (debug)
+                MyLog.Default.WriteLine($"[HeatManagement] OnPipeBlockAdded: {connectedNeighbors.Count} pipe neighbors");
+
+            foreach (var neighbor in connectedNeighbors)
+            {
+                foreach (var manager in _pipeNetworks)
+                {
+                    var node = manager.TryGetNode(neighbor);
+                    if (node == null) continue;
+
+                    if (debug)
+                        MyLog.Default.WriteLine($"[HeatManagement] OnPipeBlockAdded: neighbor {neighbor.DisplayNameText} in network #{manager.GetHashCode()}");
+
+                    if (!connectedManagers.Contains(manager))
+                        connectedManagers.Add(manager);
+                    neighborNodes[node] = manager;
+                }
+            }
+
+            if (debug)
+                MyLog.Default.WriteLine($"[HeatManagement] OnPipeBlockAdded: {connectedManagers.Count} connected managers");
+
+            var newNode = new HeatPipeNode { Block = block };
+
+            if (connectedManagers.Count == 0)
+            {
+                var newManager = new HeatPipeManager(this);
+                newManager.TryAddNode(newNode);
+                _pipeNetworks.Add(newManager);
+                _heatBehaviors[block] = newManager;
+                if (debug) MyLog.Default.WriteLine($"[HeatManagement] OnPipeBlockAdded: new isolated network");
+                return;
+            }
+
+            if (connectedManagers.Count == 1)
+            {
+                var manager = connectedManagers[0];
+                foreach (var kvp in neighborNodes)
+                    manager.TryConnectNodes(newNode, kvp.Key);
+                _heatBehaviors[block] = manager;
+                if (debug) MyLog.Default.WriteLine($"[HeatManagement] OnPipeBlockAdded: extended existing network");
+                return;
+            }
+
+            // Multiple managers: merge
+            var mergedManager = new HeatPipeManager(this);
+            foreach (var mgr in connectedManagers)
+            {
+                foreach (var node in mgr.Nodes)
+                {
+                    mergedManager.TryAddNode(node);
+                    foreach (var edge in node.Connections)
+                    {
+                        if (edge.A == node && mergedManager.ContainsNode(edge.B))
+                            mergedManager.TryConnectNodes(edge.A, edge.B);
+                    }
+                }
+                _pipeNetworks.Remove(mgr);
+            }
+            mergedManager.TryAddNode(newNode);
+            foreach (var kvp in neighborNodes)
+                mergedManager.TryConnectNodes(newNode, kvp.Key);
+
+            _pipeNetworks.Add(mergedManager);
+            foreach (var node in mergedManager.Nodes)
+                _heatBehaviors[node.Block] = mergedManager;
+
+            if (debug)
+                MyLog.Default.WriteLine($"[HeatManagement] OnPipeBlockAdded: merged {connectedManagers.Count} networks → {mergedManager.Nodes.Count} nodes");
+        }
+
+        private void OnPipeBlockRemoved(IMyCubeBlock block)
+        {
+            IHeatBehavior behavior;
+            if (!_heatBehaviors.TryGetValue(block, out behavior)) return;
+
+            var pipeManager = behavior as HeatPipeManager;
+            if (pipeManager == null) return;
+
+            bool debug = _grid?.CustomName.Contains(Config.HeatDebugString) ?? false;
+            if (debug)
+                MyLog.Default.WriteLine($"[HeatManagement] OnPipeBlockRemoved: {block.DisplayNameText}");
+
+            _pipeNetworks.Remove(pipeManager);
+            _heatBehaviors.Remove(block);
+
+            var survivors = pipeManager.RemoveNode(block);
+
+            foreach (var mgr in survivors)
+            {
+                _pipeNetworks.Add(mgr);
+                foreach (var node in mgr.Nodes)
+                    _heatBehaviors[node.Block] = mgr;
+            }
+
+            if (debug)
+                MyLog.Default.WriteLine($"[HeatManagement] OnPipeBlockRemoved: {survivors.Count} survivor networks");
         }
 
         // ===== Block lifecycle =====
@@ -219,8 +365,8 @@ namespace TSUT.HeatManagement
 
             MyLog.Default.WriteLine($"[HeatManagement] OnBlockRemoved: {block.FatBlock.DisplayNameText} ({block.FatBlock.GetType().Name})");
 
-            if (behavior is IMultiBlockHeatBehavior)
-                (behavior as IMultiBlockHeatBehavior).RemoveBlock(block.FatBlock, this, _heatBehaviors);
+            if (behavior is HeatPipeManager)
+                OnPipeBlockRemoved(block.FatBlock);
             else
             {
                 try { behavior.Cleanup(); } catch (Exception ex) { MyLog.Default.Warning($"[HeatManagement] Cleanup on remove: {ex}"); }
@@ -241,6 +387,13 @@ namespace TSUT.HeatManagement
             if (!_active || _heatBehaviors.ContainsKey(block.FatBlock) || !block.FatBlock.IsFunctional)
             {
                 MyLog.Default.WriteLine($"[HeatManagement] OnBlockAdded SKIP: {block.FatBlock.DisplayNameText}, active={_active}, alreadyTracked={_heatBehaviors.ContainsKey(block.FatBlock)}, functional={block.FatBlock.IsFunctional}");
+                return;
+            }
+
+            if (HeatPipeManagerFactory.IsPipeCandidate(block.FatBlock))
+            {
+                OnPipeBlockAdded(block.FatBlock);
+                HeatSession.Api.Utils.PurgeCaches();
                 return;
             }
 
@@ -287,6 +440,7 @@ namespace TSUT.HeatManagement
                 catch (Exception ex) { MyLog.Default.Warning($"[HeatManagement] Behavior {kvp.Value.GetType().Name} threw on cleanup: {ex}"); }
             }
             _heatBehaviors.Clear();
+            _pipeNetworks.Clear();
 
             if (_grid != null)
             {
@@ -368,19 +522,13 @@ namespace TSUT.HeatManagement
 
         private void UpdatePipeNetworks(float deltaTime)
         {
-            Dictionary<IMyCubeBlock, IHeatBehavior> snapshot;
-            lock (_heatBehaviors) { snapshot = new Dictionary<IMyCubeBlock, IHeatBehavior>(_heatBehaviors); }
-
-            var called = new HashSet<IHeatBehavior>();
-            foreach (var kvp in snapshot)
+            var snapshot = new List<HeatPipeManager>(_pipeNetworks);
+            foreach (var manager in snapshot)
             {
-                if (called.Contains(kvp.Value)) continue;
-                called.Add(kvp.Value);
-                if (!(kvp.Value is HeatPipeManager)) continue;
                 try
                 {
-                    kvp.Value.SpreadHeat(deltaTime);
-                    kvp.Value.ReactOnNewHeat(0f);
+                    manager.SpreadHeat(deltaTime);
+                    manager.ReactOnNewHeat(0f);
                 }
                 catch (Exception ex) { MyLog.Default.Warning($"[HeatManagement] HeatPipeManager threw on update: {ex}"); }
             }
@@ -430,7 +578,7 @@ namespace TSUT.HeatManagement
 
         public List<HeatPipeManager> GetHeatPipeManagers()
         {
-            return _heatBehaviors.Values.OfType<HeatPipeManager>().Distinct().ToList();
+            return new List<HeatPipeManager>(_pipeNetworks);
         }
 
         public List<T> GetSpecificManagers<T>()

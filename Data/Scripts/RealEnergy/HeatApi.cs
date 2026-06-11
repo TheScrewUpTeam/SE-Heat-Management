@@ -38,7 +38,6 @@ namespace TSUT.HeatManagement
 
     public interface IMultiBlockHeatBehavior : IHeatBehavior
     {
-        void RemoveBlock(IMyCubeBlock block, IGridHeatManager gridManager, Dictionary<IMyCubeBlock, IHeatBehavior> behaviorMap);
         void ShowDebugGraph(float deltaTime);
         void MarkDirty();
     }

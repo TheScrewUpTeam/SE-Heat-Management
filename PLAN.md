@@ -248,20 +248,25 @@ Two separate commits, same pattern as Phase 6.
 
 ---
 
-## Phase 8 — Heat Pipe Network (DEFERRED)
+## Phase 8 — Heat Pipe Network ✓ DONE
 
-`HeatPipeManager` implements `IMultiBlockHeatBehavior` — one instance manages N connected pipe blocks.
-This does not map cleanly to per-block components without a network coordinator.
+Pipe management internalized into `GridHeatComponent`. `HeatPipeManagerFactory` unregistered — now static utility only.
 
-**Decision: leave `HeatPipeManagerFactory` registered for now.**
+### What changed
+- `GridHeatComponent`: owns `_pipeNetworks` list; `CollectPipeNetworks`, `OnPipeBlockAdded`, `OnPipeBlockRemoved` handle topology internally; `GetHeatPipeManagers()` O(1); `UpdatePipeNetworks` iterates `_pipeNetworks` directly
+- `HeatPipeManager`: `RemoveBlock(block, gridManager, behaviorMap)` → `RemoveNode(block) : List<HeatPipeManager>` — no external state mutation
+- `HeatPipeManagerFactory`: removed `IHeatBehaviorFactory` impl; static geometry helpers remain
+- `IMultiBlockHeatBehavior`: removed `RemoveBlock` (internal concern)
+- `Session`: removed `HeatPipeManagerFactory` registration
 
-Pipes continue working through the old factory path. `GridHeatComponent` still calls factory's
-`CollectHeatBehaviors` and `OnBlockAdded` for registered factories.
-
-Future work (separate plan):
-- `HeatPipeComponent` per pipe block
-- `HeatPipeNetworkCoordinator` (grid-level or standalone) handles connectivity graph
-- OR: keep factory as permanent solution (pipes are fundamentally multi-block, factory fits)
+### Test criteria
+- [x] Pipe networks form on grid load
+- [x] New pipe extends network
+- [x] New pipe merges networks
+- [x] Pipe removal splits network
+- [x] Pipe removal dissolves network
+- [x] Deactivate clears `_pipeNetworks`; reactivation rebuilds
+- [x] Heat spreads through network
 
 ---
 

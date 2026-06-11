@@ -61,8 +61,6 @@ namespace TSUT.HeatManagement
             Instance = this;
             MyLog.Default.WriteLine($"[HeatManagement] HeatSession instance created.");
 
-            _heatApi.Registry.RegisterHeatBehaviorFactory(new HeatPipeManagerFactory());
-
             MyAPIGateway.Utilities.RegisterMessageHandler(HmsApi.HeatProviderMesageId, OnHeatProviderRegister);
             var shareable = ConvertApiToShareable(_heatApi);
             MyAPIGateway.Utilities.SendModMessage(HmsApi.HeatApiMessageId, shareable);
