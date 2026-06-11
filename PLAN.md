@@ -151,8 +151,8 @@ with a grid-level `GridHeatComponent` replacing the manually managed `GridHeatMa
 3. Remove `ConnectorHeatManagerFactory`
 
 ### Test criteria
-- [ ] Connector heat on connection/disconnection
-- [ ] Placed mid-game works
+- [x] Connector heat on connection/disconnection
+- [x] Placed mid-game works
 
 ---
 
@@ -285,6 +285,7 @@ Remove dead code from `Session.cs`:
 
 - Factory scanning calls for migrated block types (battery, connector, rotor, piston, thruster, vent, exhaust, heatvent)
 - `OnBlockAdded` factory dispatch for those types (pipes still need it)
+- Merge `BatteryGameLogic.cs` into `BatteryHeatComponent.cs`, delete `BatteryGameLogic.cs`
 - Any remaining `GridHeatManager` references
 - `CollectHeatBehaviors` calls for migrated types
 
