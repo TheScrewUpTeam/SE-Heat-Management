@@ -129,7 +129,7 @@ namespace TSUT.HeatManagement
             bool isBelow = EventController.IsLowerOrEqualCondition;
             IMyCubeGrid grid = EventController.CubeGrid;
             GridHeatComponent gridHeatManager;
-            HeatSession.GetGridHeatManager(grid, out gridHeatManager);
+            HeatSession.TryGetGridHeatManager(grid, out gridHeatManager);
 
             bool result;
             float currentTemperature = gridHeatManager.GetMaxTemperature();
@@ -167,7 +167,7 @@ namespace TSUT.HeatManagement
             info.AppendLine();
             IMyCubeGrid grid = EventController.CubeGrid;
             GridHeatComponent gridHeatManager;
-            HeatSession.GetGridHeatManager(grid, out gridHeatManager);
+            HeatSession.TryGetGridHeatManager(grid, out gridHeatManager);
             var num = gridHeatManager.GetMaxTemperature();
             var blockInput = num.ToString("F1");
             info.AppendFormat(MyTexts.GetString(MySpaceTexts.EventBlockInputInfo), grid.CustomName, blockInput, "°C");

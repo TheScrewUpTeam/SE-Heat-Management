@@ -134,7 +134,6 @@ namespace TSUT.HeatManagement
             
             _isInitialized = true;
 
-            HeatSession.AttachO2GridManager(this, _grid);
         }
 
         private void OnBlockChanged(IMySlimBlock block)

@@ -51,9 +51,6 @@ namespace TSUT.HeatManagement
         private HeatCommands _commandsInstance;
         public static HeatSession Instance { get; private set; }
 
-        // No-op: GridHeatComponent gets GridO2Manager lazily via Components.Get<>
-        public static void AttachO2GridManager(GridO2Manager manager, IMyCubeGrid grid) { }
-
         public override void LoadData()
         {
             // Load config (will use defaults if file doesn't exist)
@@ -122,10 +119,6 @@ namespace TSUT.HeatManagement
         public override void UpdateBeforeSimulation()
         {
             ClientSideUpdates();
-
-            if (MyAPIGateway.Multiplayer.IsServer)
-                ServerSideUpdates();
-
             _tickCount++;
         }
 
@@ -171,11 +164,6 @@ namespace TSUT.HeatManagement
             {
                 _debugHud.Hide();
             }
-        }
-
-        private void ServerSideUpdates()
-        {
-            // GridHeatComponent drives its own update loop per grid.
         }
 
         private void ClientSideUpdates()
@@ -285,12 +273,6 @@ namespace TSUT.HeatManagement
         }
 
         public static bool TryGetGridHeatManager(IMyCubeGrid grid, out GridHeatComponent manager)
-        {
-            manager = null;
-            return grid != null && _gridComponentCache.TryGetValue(grid.EntityId, out manager);
-        }
-
-        public static bool GetGridHeatManager(IMyCubeGrid grid, out GridHeatComponent manager)
         {
             manager = null;
             return grid != null && _gridComponentCache.TryGetValue(grid.EntityId, out manager);

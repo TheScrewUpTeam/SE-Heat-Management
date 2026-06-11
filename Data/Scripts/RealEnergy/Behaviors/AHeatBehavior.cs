@@ -23,7 +23,7 @@ namespace TSUT.HeatManagement
             float tempOwn = HeatSession.Api.Utils.GetHeat(block);
             float capacityOwn = HeatSession.Api.Utils.GetThermalCapacity(block);
             GridHeatComponent gridHeatManager;
-            HeatSession.GetGridHeatManager(block.CubeGrid, out gridHeatManager);
+            HeatSession.TryGetGridHeatManager(block.CubeGrid, out gridHeatManager);
 
             var neighborList = new List<IMySlimBlock>();
             block.SlimBlock.GetNeighbours(neighborList);
