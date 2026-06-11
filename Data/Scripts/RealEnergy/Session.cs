@@ -364,7 +364,7 @@ namespace TSUT.HeatManagement
                 heatApi.Utils.EstimateSpecificHeat(density)) },
                 { "GetActiveThrusterHeatLoss", new Func<long, float, float, float>((thrusterId, ratio, dt) =>
                     heatApi.Utils.GetActiveThrusterHeatLoss(MyAPIGateway.Entities.GetEntityById(thrusterId) as IMyThrust, ratio, dt)) },
-                { "GetActiveVentHeatLoss", new Func<long, float, float>((ventId, dt) =>
+                { "GetActiveVentHealLoss", new Func<long, float, float>((ventId, dt) =>
                     heatApi.Utils.GetActiveVentHealLoss(MyAPIGateway.Entities.GetEntityById(ventId) as IMyAirVent, dt)) },
                 { "GetActiveHeatVentLoss", new Func<long, float, float>((ventId, dt) =>
                     heatApi.Utils.GetActiveHeatVentLoss(MyAPIGateway.Entities.GetEntityById(ventId) as IMyHeatVent, dt)) },

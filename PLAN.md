@@ -270,7 +270,7 @@ Pipe management internalized into `GridHeatComponent`. `HeatPipeManagerFactory` 
 
 ---
 
-## Phase 9 — Backward Compat Audit
+## Phase 9 — Backward Compat Audit ✓ DONE
 
 Verify satellite mod surface intact:
 
@@ -286,9 +286,9 @@ Verify satellite mod surface intact:
 | `HeatSession.Api` | Unchanged |
 
 ### Test criteria
-- [ ] Satellite mod with custom factory: loads, behaviors registered, `TryGetHeatBehaviour` works
-- [ ] Satellite mod calling `IHeatUtils` methods: correct results
-- [ ] No compile errors in satellite mod source against new API
+- [x] Satellite mod with custom factory: loads, behaviors registered, `TryGetHeatBehaviour` works
+- [x] Satellite mod calling `IHeatUtils` methods: correct results
+- [x] No compile errors in satellite mod source against new API
 
 ---
 
