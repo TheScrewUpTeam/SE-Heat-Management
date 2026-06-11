@@ -81,11 +81,11 @@ namespace TSUT.HeatManagement
             if (_vent.IsWorking && turboO2Usage > 0)
             {
                 var leftOvers = _gridHeatComponent != null
-                    ? _gridHeatComponent.ConsumeO2(turboO2Usage, deltaTime, Block)
-                    : turboO2Usage;
+                    ? _gridHeatComponent.ConsumeO2(turboO2Usage * deltaTime, deltaTime, Block)
+                    : turboO2Usage * deltaTime;
                 if (leftOvers <= 0)
                 {
-                    change += turboO2Usage * Config.Instance.VENT_TURBO_COOLING_RATE / HeatSession.Api.Utils.GetThermalCapacity(_vent);
+                    change += turboO2Usage * deltaTime * Config.Instance.VENT_TURBO_COOLING_RATE / HeatSession.Api.Utils.GetThermalCapacity(_vent);
                     HeatSession.Api.Effects.InstantiateSteam(_vent);
                 }
                 else

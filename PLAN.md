@@ -224,7 +224,7 @@ Merging a new grid into an existing grid causes the merged grid's blocks (observ
 ### Test criteria
 - [x] Vent passive cooling works
 - [x] Vent active cooling (working=true) works
-- [ ] Turbo mode: O2 consumed, steam effect shown — **pre-existing bug, deferred to Phase 11**
+- [x] Turbo mode: O2 consumed, steam effect shown — fixed in Phase 11
 - [x] O2Turbo setting persists across save/load
 - [x] Terminal controls (slider, actions) appear and function
 
@@ -358,10 +358,10 @@ Remove dead code from `Session.cs`:
 - `MODIFY: CONFIGURATION.md` (VENT_TURBO_COOLING_RATE, LOG_FLAGS added; version → 1.3.3)
 
 ### Remaining bugs in VentHeatComponent (not yet fixed)
-- [ ] Unit mismatch: `ConsumeO2(turboO2Usage, deltaTime, Block)` — should pass `turboO2Usage * deltaTime` (L/s × s = L)
-- [ ] Missing deltaTime in cooling calc: `turboO2Usage * Config.VENT_TURBO_COOLING_RATE / capacity` — needs `* deltaTime`
-- [ ] Steam effect: `InstantiateSteam` called every tick — should return early if already running
-- [ ] Minor: `CalculateO2Production` called twice in `ConveyorManager.Consume()`
+- [x] Unit mismatch: `ConsumeO2(turboO2Usage, deltaTime, Block)` — should pass `turboO2Usage * deltaTime` (L/s × s = L)
+- [x] Missing deltaTime in cooling calc: `turboO2Usage * Config.VENT_TURBO_COOLING_RATE / capacity` — needs `* deltaTime`
+- [x] Steam effect: `InstantiateSteam` — effect now loops via session-time tracking + `Play()` with `SteamRestartThreshold = 0.75f`
+- [x] Minor: `CalculateO2Production` called twice in `ConveyorManager.Consume()`
 
 ### Test criteria
 - [x] O2 network builds on grid load (logs confirm)

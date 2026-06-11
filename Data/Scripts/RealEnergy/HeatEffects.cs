@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Sandbox.Game.Lights;
+using Sandbox.ModAPI;
 using VRage.Game;
 using VRage.Game.ModAPI;
 using VRageMath;
@@ -8,8 +9,11 @@ namespace TSUT.HeatManagement
 {
     public class HeatEffects : IHeatEffects
     {
+        private const float SteamRestartThreshold = 0.75f;
+
         private readonly Dictionary<IMyCubeBlock, MyLight> _lights = new Dictionary<IMyCubeBlock, MyLight>();
         private readonly Dictionary<IMyCubeBlock, MyParticleEffect> blocksAtSmoke = new Dictionary<IMyCubeBlock, MyParticleEffect>();
+        private readonly Dictionary<IMyCubeBlock, double> _steamStartTimes = new Dictionary<IMyCubeBlock, double>();
 
         public void UpdateLightsPosition()
         {
@@ -104,11 +108,18 @@ namespace TSUT.HeatManagement
         public void InstantiateSteam(IMyCubeBlock block)
         {
             MyParticleEffect oldEffect;
-            if (blocksAtSmoke.TryGetValue(block, out oldEffect) && !oldEffect.IsStopped)
+            if (blocksAtSmoke.TryGetValue(block, out oldEffect))
             {
-                oldEffect.Stop(false);
-                oldEffect.Clear();
+                var duration = oldEffect.DurationMax;
+                double startTime;
+                double now = MyAPIGateway.Session.ElapsedPlayTime.TotalSeconds;
+                if (duration <= 0 || !_steamStartTimes.TryGetValue(block, out startTime) || (now - startTime) < duration * SteamRestartThreshold)
+                    return;
+                oldEffect.Play();
+                _steamStartTimes[block] = now;
+                return;
             }
+
             MyParticleEffect effect;
             var position = block.GetPosition();
             Vector3D forward = block.WorldMatrix.Forward;
@@ -120,7 +131,9 @@ namespace TSUT.HeatManagement
                 effect.UserScale = block.CubeGrid.GridSize / 5;
                 effect.UserColorMultiplier = Color.White;
                 effect.UserColorIntensityMultiplier = 5;
+                effect.Autodelete = false;
                 blocksAtSmoke[block] = effect;
+                _steamStartTimes[block] = MyAPIGateway.Session.ElapsedPlayTime.TotalSeconds;
             }
         }
 
@@ -146,6 +159,7 @@ namespace TSUT.HeatManagement
                 effect.Stop();
                 effect.Clear();
                 blocksAtSmoke.Remove(battery);
+                _steamStartTimes.Remove(battery);
             }
         }
     }
