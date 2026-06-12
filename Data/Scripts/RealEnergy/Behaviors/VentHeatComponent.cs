@@ -24,11 +24,14 @@ namespace TSUT.HeatManagement
         {
             _vent = (IMyAirVent)Entity;
             _sourceComp = _vent.Components.Get<MyResourceSourceComponent>();
-            _vent.AppendingCustomInfo += AppendVentHeatInfo;
-
             base.UpdateOnceBeforeFrame();
-
             RegisterTerminalControls();
+        }
+
+        protected override void OnAttachedToScene()
+        {
+            _vent.AppendingCustomInfo -= AppendVentHeatInfo;
+            _vent.AppendingCustomInfo += AppendVentHeatInfo;
         }
 
         public override void Cleanup()

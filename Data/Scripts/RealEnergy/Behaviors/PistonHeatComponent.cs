@@ -21,7 +21,6 @@ namespace TSUT.HeatManagement
         public override void UpdateOnceBeforeFrame()
         {
             base.UpdateOnceBeforeFrame();
-            PistonBase.AppendingCustomInfo += GetCustomInfo;
             PistonBase.SetDetailedInfoDirty();
             PistonBase.RefreshCustomInfo();
 
@@ -30,6 +29,12 @@ namespace TSUT.HeatManagement
                 _controlsRegistered = true;
                 HeatSession.Api.Utils.TryRegister<IMyPistonBase>();
             }
+        }
+
+        protected override void OnAttachedToScene()
+        {
+            PistonBase.AppendingCustomInfo -= GetCustomInfo;
+            PistonBase.AppendingCustomInfo += GetCustomInfo;
         }
 
         public override void Cleanup()

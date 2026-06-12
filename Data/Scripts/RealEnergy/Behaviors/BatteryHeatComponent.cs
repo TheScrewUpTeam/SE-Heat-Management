@@ -22,8 +22,13 @@ namespace TSUT.HeatManagement
         public override void UpdateOnceBeforeFrame()
         {
             base.UpdateOnceBeforeFrame();
-            Battery.AppendingCustomInfo += AppendBatteryHeatInfo;
             RegisterControls();
+        }
+
+        protected override void OnAttachedToScene()
+        {
+            Battery.AppendingCustomInfo -= AppendBatteryHeatInfo;
+            Battery.AppendingCustomInfo += AppendBatteryHeatInfo;
         }
 
         private static void RegisterControls()

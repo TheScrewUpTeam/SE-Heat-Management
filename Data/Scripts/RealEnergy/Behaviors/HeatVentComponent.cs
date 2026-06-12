@@ -18,11 +18,14 @@ namespace TSUT.HeatManagement
         public override void UpdateOnceBeforeFrame()
         {
             _vent = (IMyHeatVent)Entity;
-            _vent.AppendingCustomInfo += AppendVentHeatInfo;
-
             base.UpdateOnceBeforeFrame();
-
             RegisterTerminalControls();
+        }
+
+        protected override void OnAttachedToScene()
+        {
+            _vent.AppendingCustomInfo -= AppendVentHeatInfo;
+            _vent.AppendingCustomInfo += AppendVentHeatInfo;
         }
 
         public override void Cleanup()

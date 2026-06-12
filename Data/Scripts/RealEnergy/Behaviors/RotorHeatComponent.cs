@@ -24,7 +24,6 @@ namespace TSUT.HeatManagement
         public override void UpdateOnceBeforeFrame()
         {
             base.UpdateOnceBeforeFrame();
-            Stator.AppendingCustomInfo += GetCustomInfo;
             Stator.SetDetailedInfoDirty();
             Stator.RefreshCustomInfo();
 
@@ -33,6 +32,12 @@ namespace TSUT.HeatManagement
                 _controlsRegistered = true;
                 HeatSession.Api.Utils.TryRegister<IMyMotorStator>();
             }
+        }
+
+        protected override void OnAttachedToScene()
+        {
+            Stator.AppendingCustomInfo -= GetCustomInfo;
+            Stator.AppendingCustomInfo += GetCustomInfo;
         }
 
         public override void Cleanup()

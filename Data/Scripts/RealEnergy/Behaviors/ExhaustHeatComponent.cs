@@ -17,11 +17,14 @@ namespace TSUT.HeatManagement
         public override void UpdateOnceBeforeFrame()
         {
             _exhaust = (IMyExhaustBlock)Entity;
-            _exhaust.AppendingCustomInfo += AppendExhaustHeatInfo;
-
             base.UpdateOnceBeforeFrame();
-
             RegisterTerminalControls();
+        }
+
+        protected override void OnAttachedToScene()
+        {
+            _exhaust.AppendingCustomInfo -= AppendExhaustHeatInfo;
+            _exhaust.AppendingCustomInfo += AppendExhaustHeatInfo;
         }
 
         public override void Cleanup()

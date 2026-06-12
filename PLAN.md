@@ -174,8 +174,9 @@ Two separate commits.
 - [x] Moving part heats under load
 - [x] Placed mid-game works
 
-### Known issue (deferred): Grid merge loses block component
-Merging a new grid into an existing grid causes the merged grid's blocks (observed: battery) to lose their `MyGameLogicComponent`. Heat data disappears from detailed info. Root cause unknown — needs investigation. Fix deferred to post-Phase-7 cleanup or dedicated phase.
+~~**Known issue (deferred): Grid merge loses block component**~~ ✓ Fixed (two parts).
+- **Part 1 — grid re-registration:** `AHeatGameLogicComponent` had no `OnAddedToScene` override. During merge/split SE calls `Hierarchy.RemoveChild` + `AddBlockInternal` without closing the game logic component — `UpdateOnceBeforeFrame` never re-fires. Fix: `OnAddedToScene` override detects grid change, unregisters from old `GridHeatComponent`, registers with new one. Guard: `_initialized` flag prevents registration for non-atmospheric thrusters (whose `UpdateOnceBeforeFrame` returns early) and avoids spurious re-registration before first init.
+- **Part 2 — detailed info handler lost after split:** `RemoveBlockInternal(close:false)` during split fires `OnBlockRemoved` → `behavior.Cleanup()` → `AppendingCustomInfo -= handler`. Handler never re-subscribed because `UpdateOnceBeforeFrame` doesn't re-fire. Fix: added `protected virtual void OnAttachedToScene()` hook to base class, called from both `UpdateOnceBeforeFrame` (initial subscription) and `OnAddedToScene` (re-subscription after transfer). Each of the 8 affected components (`BatteryHeatComponent`, `VentHeatComponent`, `ExhaustHeatComponent`, `HeatVentComponent`, `MotorStatorHeatComponent`, `PistonBaseHeatComponent`, `ConnectorHeatComponent`, `ThrusterHeatComponent`) overrides it to do `−= +=` (idempotent). `Cleanup()` retains `−=` for block destruction.
 
 ---
 

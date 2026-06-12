@@ -9,6 +9,7 @@ namespace TSUT.HeatManagement
     public abstract class AHeatGameLogicComponent : MyGameLogicComponent, IHeatBehavior
     {
         protected GridHeatComponent _gridHeatComponent;
+        private bool _initialized = false;
 
         public IMyCubeBlock Block => (IMyCubeBlock)Entity;
 
@@ -44,7 +45,23 @@ namespace TSUT.HeatManagement
             base.UpdateOnceBeforeFrame();
             _gridHeatComponent = ((IMyCubeBlock)Entity).CubeGrid.GameLogic.GetAs<GridHeatComponent>();
             _gridHeatComponent?.RegisterBehavior((IMyCubeBlock)Entity, this);
+            _initialized = true;
+            OnAttachedToScene();
         }
+
+        public override void OnAddedToScene()
+        {
+            base.OnAddedToScene();
+            if (!_initialized) return;
+            var newGrid = ((IMyCubeBlock)Entity).CubeGrid.GameLogic.GetAs<GridHeatComponent>();
+            if (newGrid == _gridHeatComponent) return;
+            _gridHeatComponent?.UnregisterBehavior((IMyCubeBlock)Entity);
+            _gridHeatComponent = newGrid;
+            _gridHeatComponent?.RegisterBehavior((IMyCubeBlock)Entity, this);
+            OnAttachedToScene();
+        }
+
+        protected virtual void OnAttachedToScene() { }
 
         public override void Close()
         {

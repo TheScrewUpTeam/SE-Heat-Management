@@ -21,7 +21,6 @@ namespace TSUT.HeatManagement
                 return;
 
             base.UpdateOnceBeforeFrame();
-            Thruster.AppendingCustomInfo += AppendThrusterHeatInfo;
             Thruster.SetDetailedInfoDirty();
 
             if (!_controlsRegistered)
@@ -29,6 +28,12 @@ namespace TSUT.HeatManagement
                 _controlsRegistered = true;
                 HeatSession.Api.Utils.TryRegister<IMyThrust>();
             }
+        }
+
+        protected override void OnAttachedToScene()
+        {
+            Thruster.AppendingCustomInfo -= AppendThrusterHeatInfo;
+            Thruster.AppendingCustomInfo += AppendThrusterHeatInfo;
         }
 
         public override void Cleanup()

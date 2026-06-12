@@ -20,7 +20,6 @@ namespace TSUT.HeatManagement
         public override void UpdateOnceBeforeFrame()
         {
             base.UpdateOnceBeforeFrame();
-            Connector.AppendingCustomInfo += GetCustomInfo;
             Connector.SetDetailedInfoDirty();
 
             if (!_controlsRegistered)
@@ -28,6 +27,12 @@ namespace TSUT.HeatManagement
                 _controlsRegistered = true;
                 HeatSession.Api.Utils.TryRegister<IMyShipConnector>();
             }
+        }
+
+        protected override void OnAttachedToScene()
+        {
+            Connector.AppendingCustomInfo -= GetCustomInfo;
+            Connector.AppendingCustomInfo += GetCustomInfo;
         }
 
         public override void Cleanup()
