@@ -12,7 +12,6 @@ using VRage.Game.ObjectBuilders.ComponentSystem;
 namespace TSUT.HeatManagement
 {
     [MyComponentBuilder(typeof(ObjectBuilderGridHeat))]
-    [MyComponentType(typeof(ObjectBuilderGridHeat))]
     [MyEntityDependencyType(typeof(IMyEventControllerBlock))]
     public class GridMaxTemperatureChanged : MyEventProxyEntityComponent, IMyEventComponentWithGui, IEventControllerEvent
     {

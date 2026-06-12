@@ -389,9 +389,9 @@ Remove dead code from `Session.cs`:
 
 ## Open Questions / Gotchas
 
-- **Rotor/Piston ObjectBuilder types:** verify exact `MyObjectBuilder_*` names — rotor has base + advanced variants.
-- **Exhaust/HeatVent ObjectBuilder types:** verify before writing descriptors.
-- **GridHeatComponent update loop:** currently Session drives `UpdateBlocksTemp` etc. After migration, `GridHeatComponent.UpdateAfterSimulation()` drives it — verify tick rate / interval logic matches.
-- **Grid split/merge:** SE calls `Close()` on components of the split grid and creates new grid entity. Components re-attach via descriptors automatically. Verify behaviors re-register correctly.
-- **Wheel grids:** `GridO2Manager` checks `HeatSession.IsWheelGrid()`. `GridHeatComponent` should do the same check in `EvaluateActive()`.
+- ~~**Rotor/Piston ObjectBuilder types:** verify exact `MyObjectBuilder_*` names — rotor has base + advanced variants.~~ ✓ resolved
+- ~~**Exhaust/HeatVent ObjectBuilder types:** verify before writing descriptors.~~ ✓ resolved
+- ~~**GridHeatComponent update loop:** currently Session drives `UpdateBlocksTemp` etc. After migration, `GridHeatComponent.UpdateAfterSimulation()` drives it — verify tick rate / interval logic matches.~~ ✓ resolved
+- ~~**Grid split/merge:** SE calls `Close()` on components of the split grid and creates new grid entity. Components re-attach via descriptors automatically. Verify behaviors re-register correctly.~~ ✓ resolved
+- ~~**Wheel grids:** `GridO2Manager` checks `HeatSession.IsWheelGrid()`. `GridHeatComponent` should do the same check in `EvaluateActive()`.~~ ✓ resolved
 - **block.Storage heat value:** `HeatUtils.GetHeat/SetHeat` uses a GUID key. No migration planned — keep as-is for save compatibility.
