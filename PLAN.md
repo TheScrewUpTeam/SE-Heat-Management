@@ -85,7 +85,7 @@ with a grid-level `GridHeatComponent` replacing the manually managed `GridHeatMa
 - [x] `TryGetHeatBehaviour()` returns correct behaviors
 - [x] Pipe networks still work (factory path)
 
-**Known deferred issue:** Event controller threshold sliders missing. `BeforeGameLogicInit` → `CreateTerminalControls` fires before `EventControllerBlockLogic.Init()` adds the components → `CreateTerminalInterfaceControls` never called. Affects both `BlockTemperatureChanged` and `GridMaxTemperatureChanged`. Fix deferred to post-refactor.
+~~**Known deferred issue:** Event controller threshold sliders missing.~~ ✓ Fixed. Root cause: `[MyComponentType(typeof(ObjectBuilder*))]` wrong type caused `MyComponentContainer.Add` to silently reject the SBC `DefaultComponent` entries. Secondary: `OnAddedToContainer` accessed `CubeGrid` before block was added to grid. Fixes: removed `[MyComponentType]` from both event components; moved `CubeGrid.OnBlockRemoved` subscription from `OnAddedToContainer` to `OnAddedToScene`/`OnRemovedFromScene`.
 
 ---
 
