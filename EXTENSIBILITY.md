@@ -1,6 +1,6 @@
 # Extending Heat Management System (HMS)
 
-This guide explains how 3rd party modders can integrate with the Heat Management System (HMS) mod for Space Engineers. You only need to include the `HmsApiV1.0.cs` file in your own mod project to get started.
+This guide explains how 3rd party modders can integrate with HMS. Copy `HmsApiV1.0.cs` into your mod project — no other files required.
 
 Current API Version: 1.0.2
 
@@ -8,27 +8,77 @@ Current API Version: 1.0.2
 
 ## 1. Getting Started
 
-- **Copy** `HmsApiV1.0.cs` from this mod into your own mod's source folder.
-- **Reference** it in your project (no other files are required).
+Copy `HmsApiV1.0.cs` from this mod into your own mod's source folder and reference it in your project.
 
 ---
 
-## 2. Initialization
+## 2. Adding Custom Heat Logic (Component Approach — Recommended)
 
-In your session/component/script, initialize the API:
+Extend `HmsApi.AHmsBlockComponent` and decorate it with `[MyEntityComponentDescriptor]`. Space Engineers auto-attaches the component to every matching block — no session-level wiring required.
 
 ```csharp
-private HmsApi _hmsApi;
+using TSUT.HeatManagement;
+using Sandbox.Common.ObjectBuilders;
+using VRage.Game.Components;
+using VRage.ObjectBuilders;
 
-public void InitHmsApi()
+[MyEntityComponentDescriptor(typeof(MyObjectBuilder_MyCustomBlock), false)]
+public class MyCustomBlockHeat : HmsApi.AHmsBlockComponent
 {
-    _hmsApi = new HmsApi(OnHmsReady);
-}
+    public override float GetHeatChange(float deltaTime)
+    {
+        // Return heat to add (positive) or remove (negative) per tick
+        return 50f * deltaTime; // e.g. constant 50 °C/s heat source
+    }
 
-private void OnHmsReady()
-{
-    // Now you can use _hmsApi.Utils and _hmsApi.Effects and register Custom Heat Behavior(s)
+    public override void SpreadHeat(float deltaTime)
+    {
+        // Call built-in conduction to neighboring blocks
+        SpreadHeatStandard(deltaTime);
+    }
+
+    public override void OnDetachedFromHeatSystem()
+    {
+        // HMS-specific cleanup only (e.g. cancel heat-related state).
+        // Do NOT unsubscribe SE events here — use Close() for that.
+    }
+
+    public override void ReactOnNewHeat(float heat)
+    {
+        // React to temperature changes — trigger effects, damage, etc.
+        if (heat > 800f)
+            HmsApi.Instance?.Effects?.InstantiateSmoke(Block);
+        else
+            HmsApi.Instance?.Effects?.RemoveSmoke(Block);
+    }
+
+    public override void Close()
+    {
+        // Unsubscribe SE events here, not in OnDetachedFromHeatSystem.
+        base.Close();
+    }
 }
+```
+
+That's all. No `HmsApi` constructor call needed — the component initializes HMS automatically and handles late-joining blocks (placed after world load) correctly.
+
+If you also need the API in a session component (e.g. for `Utils` queries outside of block logic), access the shared instance:
+
+```csharp
+var api = HmsApi.Instance; // non-null once HMS is loaded
+if (api?.Utils != null)
+{
+    float heat = api.Utils.GetHeat(someBlock);
+}
+```
+
+Or subscribe to the ready callback:
+
+```csharp
+new HmsApi(() =>
+{
+    // HmsApi.Instance.Utils is now available
+});
 ```
 
 ---
@@ -37,232 +87,121 @@ private void OnHmsReady()
 
 ### Utility Functions
 
-Access heat-related calculations and queries via `_hmsApi.Utils` (see `IHeatUtils` interface for all available methods):
-
 ```csharp
 // Basic heat operations
-float heat = _hmsApi.Utils.GetHeat(block);
-_hmsApi.Utils.SetHeat(block, 100f);
-// OR
-float newHeat = _hmsApi.Utils.ApplyHeatChange(block, 50f);
+float heat = HmsApi.Instance.Utils.GetHeat(block);
+HmsApi.Instance.Utils.SetHeat(block, 100f);
+float newHeat = HmsApi.Instance.Utils.ApplyHeatChange(block, 50f);
 
 // Environmental queries
-float ambientTemp = _hmsApi.Utils.CalculateAmbientTemperature(block);
-float airDensity = _hmsApi.Utils.GetAirDensity(block);
-float windSpeed = _hmsApi.Utils.GetBlockWindSpeed(block);
-bool isPressurized = _hmsApi.Utils.IsBlockInPressurizedRoom(block);
+float ambientTemp = HmsApi.Instance.Utils.CalculateAmbientTemperature(block);
+float airDensity  = HmsApi.Instance.Utils.GetAirDensity(block);
+float windSpeed   = HmsApi.Instance.Utils.GetBlockWindSpeed(block);
+bool pressurized  = HmsApi.Instance.Utils.IsBlockInPressurizedRoom(block);
 
 // Heat exchange calculations
-float exchangeAmount = _hmsApi.Utils.GetExchangeUniversal(block, neighborBlock, deltaTime);
-var networkData = _hmsApi.Utils.GetNetworkData(block);
+float exchange   = HmsApi.Instance.Utils.GetExchangeUniversal(block, neighbor, deltaTime);
+var networkData  = HmsApi.Instance.Utils.GetNetworkData(block);
 ```
 
 ### Effects
 
-Trigger visual effects via `_hmsApi.Effects` (see `IHeatEffects` interface):
-
 ```csharp
-_hmsApi.Effects.InstantiateSmoke(batteryBlock);
+HmsApi.Instance.Effects.InstantiateSmoke(block);
+HmsApi.Instance.Effects.RemoveSmoke(block);
+HmsApi.Instance.Effects.UpdateBlockHeatLight(block, heat);
 ```
 
 ---
 
 ## 4. Heat Network Integration
 
-The HMS now includes support for heat networks (like heat pipes). You can query network data and calculate heat exchange between blocks in the network:
-
 ```csharp
-// Get heat network data for a block
-var networkData = _hmsApi.Utils.GetNetworkData(block);
+var networkData = HmsApi.Instance.Utils.GetNetworkData(block);
 if (networkData != null)
 {
-    // Block is part of a heat network
-    var networkSize = networkData.length;
+    int size  = networkData.Value.length;
+    float avg = networkData.Value.averageTemperature;
 }
 
-// Calculate heat exchange considering both direct contact and network connections
-float exchangeAmount = _hmsApi.Utils.GetExchangeUniversal(block, otherBlock, deltaTime);
+// Exchange considering both adjacency and pipe networks
+float exchange = HmsApi.Instance.Utils.GetExchangeUniversal(block, otherBlock, deltaTime);
 ```
 
-## 5. Registering Custom Heat Behaviors
+---
 
-To add your own heat logic for specific blocks, use `RegisterHeatBehaviorFactory`:
+## 5. O2 Distribution System Integration
 
 ```csharp
-_hmsApi.RegisterHeatBehaviorFactory(
-    grid => grid.GetFatBlocks<IMyCubeBlock>().Where(b => b.BlockDefinition.SubtypeName == "MyCustomBlock").ToList(),
-    block => new MyCustomHeatBehavior(block)
-);
+// Consume O2 — returns unmet demand
+float unmet = HmsApi.Instance.Utils.ConsumeO2(amount: 10f, deltaTime: 0.016f, block: myBlock);
+if (unmet > 0.001f)
+    ApplyO2Penalty(unmet);
+
+// Check without consuming
+bool hasEnough = HmsApi.Instance.Utils.HasEnoughO2(amount: 5f, deltaTime: 0.016f, block: myBlock);
 ```
 
-- The **first function** selects which blocks on a grid should have your custom heat logic.
-- The **second function** creates your custom `AHeatBehavior` for each selected block.
+---
 
-#### Example Custom Behavior
+## 6. Terminal Property Integration
+
+HMS automatically adds a read-only "Heat Temperature" terminal property to all blocks. Readable from programmable block scripts:
 
 ```csharp
+float temp = battery.GetValue<float>("HeatTemperature");
+```
+
+---
+
+## 7. Configuration
+
+```csharp
+HmsApi.HmsConfig cfg = HmsApi.Instance.Utils.GetHmsConfig();
+float criticalTemp = cfg.CRITICAL_TEMP;
+```
+
+---
+
+## 8. Advanced: Factory Registration
+
+Use this approach when you cannot use `[MyEntityComponentDescriptor]` — for example, when block selection logic is dynamic or data-driven at runtime.
+
+```csharp
+new HmsApi(() =>
+{
+    HmsApi.Instance.RegisterHeatBehaviorFactory(
+        grid => grid.GetFatBlocks<IMyCubeBlock>()
+                    .Where(b => b.BlockDefinition.SubtypeName == "MyCustomBlock")
+                    .ToList(),
+        block => new MyCustomHeatBehavior(block)
+    );
+});
+
 public class MyCustomHeatBehavior : HmsApi.AHeatBehavior
 {
     public MyCustomHeatBehavior(IMyCubeBlock block) : base(block) { }
 
-    public override float GetHeatChange(float deltaTime)
-    {
-        // Your custom heat logic here
-        return 0f;
-    }
-
-    public override void SpreadHeat(float deltaTime)
-    {
-        // Optional: implement heat spreading
-    }
-
-    public override void Cleanup()
-    {
-        // Optional: cleanup logic
-    }
-
-    public override void ReactOnNewHeat(float heat)
-    {
-        // Optional: respond to heat changes
-    }
+    public override float GetHeatChange(float deltaTime) => 0f;
+    public override void SpreadHeat(float deltaTime) { }
+    public override void Cleanup() { }
+    public override void ReactOnNewHeat(float heat) { }
 }
 ```
 
 ---
 
-## 5. Best Practices
-
-- Only register your factory once (e.g., in your session/component init).
-- Use the provided interfaces for all heat-related queries and effects.
-- See the XML comments in `HmsApiV1.0.cs` for detailed documentation on each method.
-
----
-
-## 6. Troubleshooting
+## 9. Troubleshooting
 
 - Ensure your mod loads after HMS in the mod list.
-- If `OnHmsReady` is not called, check that HMS is enabled and up to date.
+- If `ReactOnNewHeat` / `GetHeatChange` are never called, verify the `[MyEntityComponentDescriptor]` type matches your block's `MyObjectBuilder_*` type exactly.
+- `HmsApi.Instance` is null until HMS loads — guard with `?.` or check `Utils != null`.
 - Use log output to debug integration issues.
 
 ---
 
-## 7. Terminal Property Integration
-
-### Heat Temperature Display
-
-HMS automatically adds a read-only "Heat Temperature" property to all terminal blocks in the control panel. This property displays the current heat value of any block using the HMS system.
-
-**Features:**
-
-- Displays current heat value in degrees Celsius
-- Updates in real-time as block temperatures change
-- Read-only (cannot be modified by players)
-- Visible for all blocks with heat management enabled
-- Available in both single-player and multiplayer
-
-**Accessing the Property:**
-
-The Heat Temperature property is accessible programmatically via in-game scripts using the `GetValue<T>()` method:
-
-```csharp
-public void Main(string argument, UpdateType updateSource)
-{
-    var battery = GridTerminalSystem.GetBlockWithName("Test Battery");
-    float temp = battery.GetValue<float>("HeatTemperature");
-    Echo($"Temperature: {temp}");
-}
-```
-
-This allows you to read the current heat value from any terminal block in your programmable block scripts.
-
----
-
-## 8. O2 Distribution System Integration
-
-The HMS now includes an internal O2 Distribution System that can be used by 3rd party mods to manage oxygen consumption across conveyor-connected blocks. This system automatically accounts for O2 production and storage across the entire conveyor network.
-
-### Consuming O2
-
-```csharp
-// Consume O2 from the distribution system
-// Returns: The amount of O2 that could not be fulfilled by production/storage
-float unmetDemand = _hmsApi.Utils.ConsumeO2(
-    amount: 10f,              // Amount of O2 to consume (in L)
-    deltaTime: 0.016f,        // Time interval that consumtion happened (in seconds)
-    block: consumingBlock     // The block consuming the O2
-);
-
-if (unmetDemand > 0.001f)
-{
-    // Not enough O2 available - handle shortage
-    ApplyO2ProductionPenalty(unmetDemand);
-}
-```
-
-### Checking O2 Availability
-
-```csharp
-// Check if there's enough O2 without consuming anything
-// Useful for previewing O2 requirements or condition checking
-bool hasEnough = _hmsApi.Utils.HasEnoughO2(
-    amount: 5f,               // Amount of O2 required (in L)
-    deltaTime: 0.016f,        // Time interval that consumtion happened (in seconds)
-    block: requestingBlock    // The block checking for O2
-);
-
-if (hasEnough)
-{
-    // Safe to start O2-dependent operations
-    ActivateO2DependedSystems();
-}
-```
-
-### How It Works
-
-The O2 Distribution System automatically:
-- Collects O2 from all connected producers (Oxygen Farms, Tanks) via conveyors
-- Tracks available O2 storage capacity across the network
-- Distributes O2 consumption fairly based on requests
-- Returns any unmet demand for your mod to handle
-
-**Requirements:**
-- Blocks must be conveyor-connected to the O2 network
-- O2 producers/generators must be available in the network
-- Blocks must provide their EntityId when requesting O2
-
-### Integration Example
-
-```csharp
-public class MyO2DependentBlock : MyLogicComponent
-{
-    private HmsApi _hmsApi;
-    private float _o2ConsumptionRate = 5.0f; // L/s
-
-    public override void UpdateAfterSimulation()
-    {
-        if (_hmsApi != null && _hmsApi.Utils != null)
-        {
-            // Try to consume required O2
-            float unmetO2 = _hmsApi.Utils.ConsumeO2(
-                _o2ConsumptionRate * MyEngineConstants.UPDATE_STEP_SIZE_IN_SECONDS,
-                MyEngineConstants.UPDATE_STEP_SIZE_IN_SECONDS,
-                this.Block
-            );
-
-            if (unmetO2 > 0.001f)
-            {
-                // O2 shortage - reduce efficiency, damage block, emit warning, etc.
-                ApplyO2ShortagePenalty(unmetO2);
-            }
-        }
-    }
-}
-```
-
-## 9. License
+## 10. License
 
 See `LICENSE.txt` for usage terms.
 
----
-
-For questions or advanced integration, see the comments in `HmsApiV1.0.cs` or contact the HMS maintainers via Discord https://discord.com/invite/Zy6GT4nGfC.
+For questions or advanced integration, see the XML comments in `HmsApiV1.0.cs` or contact the HMS maintainers via Discord https://discord.com/invite/Zy6GT4nGfC.

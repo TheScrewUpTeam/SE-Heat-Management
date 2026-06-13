@@ -79,6 +79,21 @@ namespace TSUT.HeatManagement
                 var mapper = (Func<long, IDictionary<string, object>>)method;
                 _heatApi.Registry.RegisterHeatMapper(mapper);
             }
+            if (call.TryGetValue("blockId", out method) && method is long)
+            {
+                object behaviorObj;
+                if (call.TryGetValue("behavior", out behaviorObj) && behaviorObj is IDictionary<string, object>)
+                {
+                    var blockId = (long)method;
+                    var behavior = (IDictionary<string, object>)behaviorObj;
+                    _heatApi.Registry.RegisterDirectBlockBehavior(blockId, behavior);
+
+                    var block = MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock;
+                    GridHeatComponent gridComp;
+                    if (block?.CubeGrid != null && _gridComponentCache.TryGetValue(block.CubeGrid.EntityId, out gridComp))
+                        gridComp.RegisterBehavior(block, new DelegateHeatBehavior(behavior, block as MyCubeBlock));
+                }
+            }
         }
 
         public static IHeatBehavior GetBehaviorForBlock(IMyCubeBlock block)

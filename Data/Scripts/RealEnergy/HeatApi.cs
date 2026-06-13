@@ -61,6 +61,8 @@ namespace TSUT.HeatManagement
         IEnumerable<Func<long, IDictionary<long, IDictionary<string, object>>>> GetHeatBehaviorProviders();
         void RegisterHeatMapper(Func<long, IDictionary<string, object>> mapper);
         IEnumerable<Func<long, IDictionary<string, object>>> GetHeatMappers();
+        void RegisterDirectBlockBehavior(long blockId, IDictionary<string, object> behavior);
+        IDictionary<long, IDictionary<string, object>> GetDirectBlockBehaviors();
     }
 
     public interface IHeatUtils

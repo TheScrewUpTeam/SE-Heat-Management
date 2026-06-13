@@ -199,6 +199,13 @@ namespace TSUT.HeatManagement
                 catch (Exception ex) { HeatLog.Warn($"Provider threw on collect: {ex}", LS.Behavior); }
             }
 
+            foreach (var kvp in HeatSession.Api.Registry.GetDirectBlockBehaviors())
+            {
+                var block = MyAPIGateway.Entities.GetEntityById(kvp.Key) as MyCubeBlock;
+                if (block != null && block.CubeGrid == _grid && !_heatBehaviors.ContainsKey(block))
+                    _heatBehaviors[block] = new DelegateHeatBehavior(kvp.Value, block);
+            }
+
             CollectPipeNetworks();
 
             var foreignBlocks = new List<IMyCubeBlock>();
