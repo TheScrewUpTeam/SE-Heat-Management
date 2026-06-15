@@ -63,6 +63,14 @@ namespace TSUT.HeatManagement
 
         protected virtual void OnAttachedToScene() { }
 
+        public bool IsInitialized => _initialized;
+
+        public void ReattachToGrid(GridHeatComponent grid)
+        {
+            _gridHeatComponent = grid;
+            OnAttachedToScene();
+        }
+
         public override void Close()
         {
             _gridHeatComponent?.UnregisterBehavior((IMyCubeBlock)Entity);

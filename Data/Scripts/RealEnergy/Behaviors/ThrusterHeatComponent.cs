@@ -17,7 +17,8 @@ namespace TSUT.HeatManagement
 
         public override void UpdateOnceBeforeFrame()
         {
-            if (!Thruster.BlockDefinition.SubtypeName.Contains(THRUSTER_CODE))
+            string subtype = Thruster != null ? Thruster.BlockDefinition.SubtypeName : "null";
+            if (!subtype.Contains(THRUSTER_CODE))
                 return;
 
             base.UpdateOnceBeforeFrame();

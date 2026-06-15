@@ -206,6 +206,20 @@ namespace TSUT.HeatManagement
                     _heatBehaviors[block] = new DelegateHeatBehavior(kvp.Value, block);
             }
 
+            var slimBlocksForLogic = new List<IMySlimBlock>();
+            _grid.GetBlocks(slimBlocksForLogic);
+            foreach (var slim in slimBlocksForLogic)
+            {
+                var fatBlock = slim.FatBlock;
+                if (fatBlock == null || !fatBlock.IsFunctional || _heatBehaviors.ContainsKey(fatBlock)) continue;
+                var logicComp = fatBlock.GameLogic.GetAs<AHeatGameLogicComponent>();
+                if (logicComp != null && logicComp.IsInitialized)
+                {
+                    _heatBehaviors[fatBlock] = logicComp;
+                    logicComp.ReattachToGrid(this);
+                }
+            }
+
             CollectPipeNetworks();
 
             var foreignBlocks = new List<IMyCubeBlock>();
@@ -420,6 +434,16 @@ namespace TSUT.HeatManagement
                         _heatBehaviors[block.FatBlock] = new DelegateHeatBehavior(logic, block.FatBlock);
                 }
                 catch (Exception ex) { HeatLog.Warn($"Mapper threw on block add: {ex}", LS.Behavior); }
+            }
+
+            if (!_heatBehaviors.ContainsKey(block.FatBlock))
+            {
+                var logicComp = block.FatBlock.GameLogic.GetAs<AHeatGameLogicComponent>();
+                if (logicComp != null && logicComp.IsInitialized)
+                {
+                    _heatBehaviors[block.FatBlock] = logicComp;
+                    logicComp.ReattachToGrid(this);
+                }
             }
 
             HeatLog.Info($"OnBlockAdded: {block.FatBlock.DisplayNameText} ({block.FatBlock.GetType().Name}), behavior attached={_heatBehaviors.Count > before}", LS.Behavior, _grid);

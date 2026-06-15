@@ -28,12 +28,28 @@ namespace TSUT.HeatManagement
                     continue;
                 }
 
-                // Update light position based on block's current position
                 kvp.Value.Position = block.GetPosition() + block.WorldMatrix.Up * 0.2f;
                 kvp.Value.UpdateLight();
             }
             foreach (var block in toRemove)
                 _lights.Remove(block);
+
+            // Restart steam effects every tick — large grids update heat infrequently,
+            // so the particle can expire before the next GetHeatChange call.
+            double now = MyAPIGateway.Session.ElapsedPlayTime.TotalSeconds;
+            foreach (var kvp in blocksAtSmoke)
+            {
+                var effect = kvp.Value;
+                var duration = effect.DurationMax;
+                if (duration <= 0) continue;
+                double startTime;
+                if (!_steamStartTimes.TryGetValue(kvp.Key, out startTime)) continue;
+                if ((now - startTime) >= duration * SteamRestartThreshold)
+                {
+                    effect.Play();
+                    _steamStartTimes[kvp.Key] = now;
+                }
+            }
         }
 
         // Call once per tick for each battery with current heat

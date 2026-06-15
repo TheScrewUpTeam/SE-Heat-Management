@@ -91,7 +91,8 @@ namespace TSUT.HeatManagement
                     var block = MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock;
                     GridHeatComponent gridComp;
                     if (block?.CubeGrid != null && _gridComponentCache.TryGetValue(block.CubeGrid.EntityId, out gridComp))
-                        gridComp.RegisterBehavior(block, new DelegateHeatBehavior(behavior, block as MyCubeBlock));
+                        if (!(gridComp.TryGetHeatBehaviour(block) is AHeatGameLogicComponent))
+                            gridComp.RegisterBehavior(block, new DelegateHeatBehavior(behavior, block as MyCubeBlock));
                 }
             }
         }
