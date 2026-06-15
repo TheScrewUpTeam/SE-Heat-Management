@@ -203,7 +203,7 @@ namespace TSUT.HeatManagement
             }
 
             var tank = terminalBlock as IMyGasTank;
-            if (tank != null && tank.BlockDefinition.SubtypeName.Contains("Oxygen"))
+            if (tank != null && (tank.BlockDefinition.SubtypeName.Contains("Oxygen") || tank.BlockDefinition.SubtypeName == ""))
             {
                 o2Storage.RemoveAll(t => t.Block == terminalBlock);
                 return;
