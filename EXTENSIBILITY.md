@@ -37,6 +37,13 @@ public class MyCustomBlockHeat : HmsApi.AHmsBlockComponent
         SpreadHeatStandard(deltaTime);
     }
 
+    protected override void OnHmsInit()
+    {
+        // Called once, only on player-owned grids, after HMS is ready.
+        // Register terminal controls and subscribe SE events here.
+        Block.AppendingCustomInfo += OnAppendCustomInfo;
+    }
+
     public override void OnDetachedFromHeatSystem()
     {
         // HMS-specific cleanup only (e.g. cancel heat-related state).
@@ -55,8 +62,11 @@ public class MyCustomBlockHeat : HmsApi.AHmsBlockComponent
     public override void Close()
     {
         // Unsubscribe SE events here, not in OnDetachedFromHeatSystem.
+        Block.AppendingCustomInfo -= OnAppendCustomInfo;
         base.Close();
     }
+
+    private void OnAppendCustomInfo(IMyTerminalBlock b, StringBuilder info) { /* ... */ }
 }
 ```
 
