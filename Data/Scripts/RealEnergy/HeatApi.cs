@@ -107,7 +107,7 @@ namespace TSUT.HeatManagement
         void RemoveSmoke(IMyCubeBlock battery);
         void UpdateBlockHeatLight(IMyCubeBlock block, float heat);
         void UpdateLightsPosition();
-        void InstantiateSteam(IMyCubeBlock battery);
+        void InstantiateSteam(IMyCubeBlock battery, float normalizedStrength = 1f);
     }
 
     public interface IHeatApi

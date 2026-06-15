@@ -89,7 +89,8 @@ namespace TSUT.HeatManagement
                 if (leftOvers <= 0)
                 {
                     change += turboO2Usage * deltaTime * Config.Instance.VENT_TURBO_COOLING_RATE / HeatSession.Api.Utils.GetThermalCapacity(_vent);
-                    HeatSession.Api.Effects.InstantiateSteam(_vent);
+                    float normalizedStrength = turboO2Usage / GetO2TurboMax(_vent);
+                    HeatSession.Api.Effects.InstantiateSteam(_vent, normalizedStrength);
                 }
                 else
                 {

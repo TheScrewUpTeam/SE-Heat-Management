@@ -14,6 +14,7 @@ namespace TSUT.HeatManagement
         private readonly Dictionary<IMyCubeBlock, MyLight> _lights = new Dictionary<IMyCubeBlock, MyLight>();
         private readonly Dictionary<IMyCubeBlock, MyParticleEffect> blocksAtSmoke = new Dictionary<IMyCubeBlock, MyParticleEffect>();
         private readonly Dictionary<IMyCubeBlock, double> _steamStartTimes = new Dictionary<IMyCubeBlock, double>();
+        private readonly Dictionary<IMyCubeBlock, float> _steamStrengths = new Dictionary<IMyCubeBlock, float>();
 
         public void UpdateLightsPosition()
         {
@@ -46,6 +47,9 @@ namespace TSUT.HeatManagement
                 if (!_steamStartTimes.TryGetValue(kvp.Key, out startTime)) continue;
                 if ((now - startTime) >= duration * SteamRestartThreshold)
                 {
+                    float strength;
+                    if (!_steamStrengths.TryGetValue(kvp.Key, out strength)) strength = 1f;
+                    ApplySteamScale(effect, kvp.Key, strength);
                     effect.Play();
                     _steamStartTimes[kvp.Key] = now;
                 }
@@ -121,11 +125,13 @@ namespace TSUT.HeatManagement
                 _lights.Remove(b);
         }
 
-        public void InstantiateSteam(IMyCubeBlock block)
+        public void InstantiateSteam(IMyCubeBlock block, float normalizedStrength = 1f)
         {
             MyParticleEffect oldEffect;
             if (blocksAtSmoke.TryGetValue(block, out oldEffect))
             {
+                _steamStrengths[block] = normalizedStrength;
+                ApplySteamScale(oldEffect, block, normalizedStrength);
                 var duration = oldEffect.DurationMax;
                 double startTime;
                 double now = MyAPIGateway.Session.ElapsedPlayTime.TotalSeconds;
@@ -144,13 +150,20 @@ namespace TSUT.HeatManagement
             uint parentId = (uint)(block.EntityId & 0xFFFFFFFF);
             if (MyParticlesManager.TryCreateParticleEffect("OxyLeakLarge", ref matrix, ref position, parentId, out effect))
             {
-                effect.UserScale = block.CubeGrid.GridSize / 5;
-                effect.UserColorMultiplier = Color.White;
-                effect.UserColorIntensityMultiplier = 5;
+                ApplySteamScale(effect, block, normalizedStrength);
                 effect.Autodelete = false;
                 blocksAtSmoke[block] = effect;
+                _steamStrengths[block] = normalizedStrength;
                 _steamStartTimes[block] = MyAPIGateway.Session.ElapsedPlayTime.TotalSeconds;
             }
+        }
+
+        private void ApplySteamScale(MyParticleEffect effect, IMyCubeBlock block, float normalizedStrength)
+        {
+            float baseScale = block.CubeGrid.GridSize / 5f;
+            effect.UserScale = baseScale * MathHelper.Lerp(0.3f, 1f, normalizedStrength);
+            effect.UserColorMultiplier = Color.White;
+            effect.UserColorIntensityMultiplier = MathHelper.Lerp(1f, 5f, normalizedStrength);
         }
 
         public void InstantiateSmoke(IMyCubeBlock block)
@@ -176,6 +189,7 @@ namespace TSUT.HeatManagement
                 effect.Clear();
                 blocksAtSmoke.Remove(battery);
                 _steamStartTimes.Remove(battery);
+                _steamStrengths.Remove(battery);
             }
         }
     }
