@@ -35,7 +35,7 @@ namespace TSUT.HeatManagement
         public float SMOKE_TRESHOLD => CRITICAL_TEMP * 0.9f;
         public float WIND_COOLING_MULT { get; set; } = 0.1f;
         public bool LIMIT_TO_PLAYER_GRIDS { get; set; } = false;
-        public int LOG_FLAGS { get; set; } = 2; // 0=off 1=Grid 2=Behavior 4=Pipe 8=O2 16=Sync 32=Net (bitmask)
+        public int LOG_FLAGS { get; set; } = 0; // 0=off 1=Grid 2=Behavior 4=Pipe 8=O2 16=Sync 32=Net (bitmask)
         public float HEATPIPE_CONDUCTIVITY { get; set; } = 3000f;
         public float EXHAUST_HEAT_REJECTION_RATE { get; set; } = 5000f; // Used for exhaust block heat rejection rate
         public bool HEAT_GLOW_INDICATION { get; set; } = true;

@@ -2,7 +2,7 @@
 
 This guide explains how 3rd party modders can integrate with HMS. Copy `HmsApiV1.0.cs` into your mod project — no other files required.
 
-Current API Version: 1.0.2
+Current API Version: 1.0.3
 
 ---
 
@@ -207,6 +207,7 @@ public class MyCustomHeatBehavior : HmsApi.AHeatBehavior
 - If `ReactOnNewHeat` / `GetHeatChange` are never called, verify the `[MyEntityComponentDescriptor]` type matches your block's `MyObjectBuilder_*` type exactly.
 - `HmsApi.Instance` is null until HMS loads — guard with `?.` or check `Utils != null`.
 - Use log output to debug integration issues.
+- Late-attaching blocks (dedicated-server remote clients, grid spawn/paste after world load) auto-request a fresh API broadcast on registration (v1.0.3+). If you're on an older copy of `HmsApiV1.0.cs`, re-copy the latest file to get this fix.
 
 ---
 

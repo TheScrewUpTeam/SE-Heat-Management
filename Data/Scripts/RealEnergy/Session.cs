@@ -59,10 +59,18 @@ namespace TSUT.HeatManagement
             HeatLog.Info("HeatSession instance created.", LS.Grid);
 
             MyAPIGateway.Utilities.RegisterMessageHandler(HmsApi.HeatProviderMesageId, OnHeatProviderRegister);
+            MyAPIGateway.Utilities.RegisterMessageHandler(HmsApi.HeatApiRequestMessageId, OnHeatApiRequested);
             var shareable = ConvertApiToShareable(_heatApi);
             MyAPIGateway.Utilities.SendModMessage(HmsApi.HeatApiMessageId, shareable);
             HeatLog.Info("HeatAPI populated.", LS.Grid);
             _commandsInstance = HeatCommands.Instance; // Initialize commands
+        }
+
+        private void OnHeatApiRequested(object obj)
+        {
+            var shareable = ConvertApiToShareable(_heatApi);
+            MyAPIGateway.Utilities.SendModMessage(HmsApi.HeatApiMessageId, shareable);
+            HeatLog.Info("HeatAPI resent on request.", LS.Grid);
         }
 
         private void OnHeatProviderRegister(object obj)
@@ -117,6 +125,7 @@ namespace TSUT.HeatManagement
             _commandsInstance?.Unload();
             networking?.Unregister();
             MyAPIGateway.Utilities.UnregisterMessageHandler(HmsApi.HeatProviderMesageId, OnHeatProviderRegister);
+            MyAPIGateway.Utilities.UnregisterMessageHandler(HmsApi.HeatApiRequestMessageId, OnHeatApiRequested);
             _gridComponentCache.Clear();
         }
 
