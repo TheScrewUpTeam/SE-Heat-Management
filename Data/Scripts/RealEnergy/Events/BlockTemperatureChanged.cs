@@ -13,7 +13,6 @@ using System;
 namespace TSUT.HeatManagement
 {
     [MyComponentBuilder(typeof(ObjectBuilderHeat))]
-    [MyComponentType(typeof(ObjectBuilderHeat))]
     [MyEntityDependencyType(typeof(IMyEventControllerBlock))]
     public class BlockTemperatureChanged : MyEventProxyEntityComponent, IMyEventComponentWithGui, IEventControllerEvent
     {
@@ -57,13 +56,25 @@ namespace TSUT.HeatManagement
         {
             base.OnAddedToContainer();
             HeatSession.Api.Registry.RegisterEventControllerEvent(this);
-            EventController.CubeGrid.OnBlockRemoved += OnBlockRemoved;
+        }
+
+        public override void OnAddedToScene()
+        {
+            base.OnAddedToScene();
+            if (EventController?.CubeGrid != null)
+                EventController.CubeGrid.OnBlockRemoved += OnBlockRemoved;
+        }
+
+        public override void OnRemovedFromScene()
+        {
+            base.OnRemovedFromScene();
+            if (EventController?.CubeGrid != null)
+                EventController.CubeGrid.OnBlockRemoved -= OnBlockRemoved;
         }
 
         public override void OnBeforeRemovedFromContainer()
         {
             base.OnBeforeRemovedFromContainer();
-            EventController.CubeGrid.OnBlockRemoved -= OnBlockRemoved;
             HeatSession.Api.Registry.RemoveEventControllerEvent(this);
         }
 

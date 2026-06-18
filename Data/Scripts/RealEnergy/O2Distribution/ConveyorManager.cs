@@ -4,7 +4,10 @@ using SpaceEngineers.Game.ModAPI;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using VRage.Game;
 using VRage.Game.ModAPI;
+using VRage.Utils;
+using VRageMath;
 
 namespace TSUT.HeatManagement
 {
@@ -69,7 +72,7 @@ namespace TSUT.HeatManagement
 
             
             var produced = CalculateO2Production(deltaTime);
-            var availableProduction = CalculateO2Production(deltaTime) - _productionUsed;
+            var availableProduction = produced - _productionUsed;
             if (o2amount < availableProduction)
             {
                 _productionUsed += o2amount;
@@ -200,7 +203,7 @@ namespace TSUT.HeatManagement
             }
 
             var tank = terminalBlock as IMyGasTank;
-            if (tank != null && tank.BlockDefinition.SubtypeName.Contains("Oxygen"))
+            if (tank != null && (tank.BlockDefinition.SubtypeName.Contains("Oxygen") || tank.BlockDefinition.SubtypeName == ""))
             {
                 o2Storage.RemoveAll(t => t.Block == terminalBlock);
                 return;
@@ -304,6 +307,20 @@ namespace TSUT.HeatManagement
             return blocks;
         }
 
+        public void ShowDebugGraph()
+        {
+            if (!isValid || _referenceBlock == null) return;
+            var allBlocks = GetAllBlocks();
+            var refPos = _referenceBlock.GetPosition();
+            var color = new Vector4(0f, 0f, 1f, 1f);
+            foreach (var block in allBlocks)
+            {
+                if (block == null || block == _referenceBlock) continue;
+                var pos = block.GetPosition();
+                MySimpleObjectDraw.DrawLine(refPos, pos, MyStringId.GetOrCompute("Square"), ref color, .05f, VRageRender.MyBillboard.BlendTypeEnum.AdditiveTop);
+            }
+        }
+
         public void Invalidate()
         {
             isValid = false;
@@ -312,6 +329,7 @@ namespace TSUT.HeatManagement
             customBlocks.Clear();
         }
 
+        public int BlockCount => producers.Count + o2Storage.Count + customBlocks.Count;
         public bool IsValid => isValid;
     }
 }

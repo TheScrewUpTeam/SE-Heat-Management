@@ -12,11 +12,13 @@ This document explains each configuration variable available in the mod, helping
 | `THERMAL_CONDUCTIVITY` | float | 500.0 | **Thermal conductivity.** Governs how efficiently heat spreads between connected blocks. Higher values mean heat equalizes faster across the grid. |
 | `HEATPIPE_CONDUCTIVITY` | float | 3000.0 | **Heat pipe conductivity.** Controls how efficiently heat pipes transfer heat between connected blocks. Higher values mean heat pipes are more effective at heat transfer. |
 | `VENT_COOLING_RATE` | float | 5000.0 | **Vent cooling rate.** The amount of heat removed per tick by a vent. Increase to make vents more effective at cooling. |
+| `VENT_TURBO_COOLING_RATE` | float | 500.0 | **Vent turbo cooling rate.** Additional heat removed per tick when a vent is running in turbo (O2-consuming) mode. Stacks with `VENT_COOLING_RATE`. |
 | `THRUSTER_COOLING_RATE` | float | 35000.0 | **Thruster cooling rate.** The amount of heat removed per tick by thrusters. Increase to make thrusters more effective at cooling themselves. |
 | `CRITICAL_TEMP` | float | 150.0 | **Critical temperature.** The temperature at which heat source blocks are considered overheated and may explode. |
 | `SMOKE_TRESHOLD` | float (derived) | 135.0 | **Smoke threshold.** Calculated as 90% of `CRITICAL_TEMP`. When block temperature exceeds this, visual smoke effects may appear. |
 | `WIND_COOLING_MULT` | float | 0.1 | **Wind cooling multiplier.** Modifies how much wind (planetary atmosphere) helps cool blocks. Increase for stronger wind cooling effects. |
 | `LIMIT_TO_PLAYER_GRIDS` | bool | false | **Limit to player grids.** If true, only grids owned by players are affected by the heat system. Set to false to include all grids. |
+| `LOG_FLAGS` | int | 8 | **Logging flags.** Bitmask controlling which subsystems write to the log. 0=off, 1=Grid, 2=Behavior, 4=Pipe, 8=O2, 16=Sync, 32=Net. Combine values to enable multiple subsystems (e.g. 12 = Pipe+O2). Logs only fire for grids whose name contains `HeatDebug`. |
 | `EXHAUST_HEAT_REJECTION_RATE` | float | 5000.0 | Controls the rate at which exhaust blocks reject heat to the environment (joules/second). |
 | `DISCHARGE_HEAT_CONFIGURABLE` | bool | false | **Discharge heat configuration.** If true, allows configuring discharge heat settings individually. |
 | `HEAT_GLOW_INDICATION` | bool | true | **Heat glow effects.** If true, enables visual glow effects on blocks as they heat up. |
@@ -58,7 +60,7 @@ For optimal heat simulation accuracy, lower values are better as they provide mo
 - Desired simulation accuracy
 
 ## Configuration Version
-Current config version: 1.2.4
+Current config version: 1.3.3
 Auto-update: By default, the configuration will automatically update when new versions are released.
 
 ## How to Edit

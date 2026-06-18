@@ -55,7 +55,7 @@ namespace TSUT.HeatManagement
                 // If another mod uses the same channel as your mod, this will throw errors being unable to deserialize their stuff.
                 // In that case, one of you must change the channelId and NOT ignoring the error as it can noticeably impact performance.
 
-                MyLog.Default.WriteLineAndConsole($"{e.Message}\n{e.StackTrace}");
+                HeatLog.Warn($"{e.Message}\n{e.StackTrace}", LS.Net);
 
                 if (MyAPIGateway.Session?.Player != null)
                     MyAPIGateway.Utilities.ShowNotification($"[ERROR: {GetType().FullName}: {e.Message} | Send SpaceEngineers.Log to mod author]", 10000, MyFontEnum.Red);
