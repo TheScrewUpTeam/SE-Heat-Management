@@ -79,7 +79,7 @@ namespace TSUT.HeatManagement
             SubscribeToOwnershipChanges();
             EvaluateActive();
 
-            _o2Manager = Entity?.GameLogic.GetAs<GridO2Manager>();
+            _o2Manager = Entity?.GameLogic?.GetAs<GridO2Manager>();
             HeatSession.RegisterGridComponent(grid.EntityId, this);
             _isInitialized = true;
             HeatLog.Info($"GridHeatComponent initialized for {grid.DisplayName} ({grid.EntityId}). Active: {_active}", LS.Grid, grid);

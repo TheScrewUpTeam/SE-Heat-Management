@@ -177,6 +177,8 @@ namespace TSUT.HeatManagement
                 return dirs;
 
             // 2. Try conveyor dummies
+            if (block.Model == null)
+                return new Base6Directions.Direction[0];
             var dummies = new Dictionary<string, IMyModelDummy>();
             block.Model.GetDummies(dummies);
 
@@ -226,6 +228,8 @@ namespace TSUT.HeatManagement
             else
             {
                 // 2. Check for conveyor dummies
+                if (block.Model == null)
+                    return false; // model not loaded yet — don't cache
                 var dummies = new Dictionary<string, IMyModelDummy>();
                 block.Model.GetDummies(dummies);
 
