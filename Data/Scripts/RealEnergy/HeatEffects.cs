@@ -18,19 +18,31 @@ namespace TSUT.HeatManagement
 
         public void UpdateLightsPosition()
         {
+            if (MyAPIGateway.Utilities.IsDedicated)
+                return;
+
             var toRemove = new List<IMyCubeBlock>();
             foreach (var kvp in _lights)
             {
                 var block = kvp.Key;
                 if (block == null || block.MarkedForClose)
                 {
-                    kvp.Value.Clear();
+                    SafeClearLight(kvp.Value);
                     toRemove.Add(block);
                     continue;
                 }
 
-                kvp.Value.Position = block.GetPosition() + block.WorldMatrix.Up * 0.2f;
-                kvp.Value.UpdateLight();
+                try
+                {
+                    kvp.Value.Position = block.GetPosition() + block.WorldMatrix.Up * 0.2f;
+                    kvp.Value.UpdateLight();
+                }
+                catch
+                {
+                    // Underlying render object went stale (e.g. grid unloaded from render clusters) — drop it.
+                    SafeClearLight(kvp.Value);
+                    toRemove.Add(block);
+                }
             }
             foreach (var block in toRemove)
                 _lights.Remove(block);
@@ -38,27 +50,57 @@ namespace TSUT.HeatManagement
             // Restart steam effects every tick — large grids update heat infrequently,
             // so the particle can expire before the next GetHeatChange call.
             double now = MyAPIGateway.Session.ElapsedPlayTime.TotalSeconds;
+            var staleSmoke = new List<IMyCubeBlock>();
             foreach (var kvp in blocksAtSmoke)
             {
+                var block = kvp.Key;
                 var effect = kvp.Value;
-                var duration = effect.DurationMax;
-                if (duration <= 0) continue;
-                double startTime;
-                if (!_steamStartTimes.TryGetValue(kvp.Key, out startTime)) continue;
-                if ((now - startTime) >= duration * SteamRestartThreshold)
+                if (block == null || block.MarkedForClose || effect == null)
                 {
-                    float strength;
-                    if (!_steamStrengths.TryGetValue(kvp.Key, out strength)) strength = 1f;
-                    ApplySteamScale(effect, kvp.Key, strength);
-                    effect.Play();
-                    _steamStartTimes[kvp.Key] = now;
+                    staleSmoke.Add(block);
+                    continue;
+                }
+
+                try
+                {
+                    var duration = effect.DurationMax;
+                    if (duration <= 0) continue;
+                    double startTime;
+                    if (!_steamStartTimes.TryGetValue(block, out startTime)) continue;
+                    if ((now - startTime) >= duration * SteamRestartThreshold)
+                    {
+                        float strength;
+                        if (!_steamStrengths.TryGetValue(block, out strength)) strength = 1f;
+                        ApplySteamScale(effect, block, strength);
+                        effect.Play();
+                        _steamStartTimes[block] = now;
+                    }
+                }
+                catch
+                {
+                    // Underlying particle effect went stale (e.g. parent entity removed without RemoveSmoke) — drop it.
+                    staleSmoke.Add(block);
                 }
             }
+            foreach (var block in staleSmoke)
+            {
+                blocksAtSmoke.Remove(block);
+                _steamStartTimes.Remove(block);
+                _steamStrengths.Remove(block);
+            }
+        }
+
+        private static void SafeClearLight(MyLight light)
+        {
+            try { light?.Clear(); } catch { /* stale render object, nothing to clean up */ }
         }
 
         // Call once per tick for each battery with current heat
         public void UpdateBlockHeatLight(IMyCubeBlock block, float heat)
         {
+            if (MyAPIGateway.Utilities.IsDedicated)
+                return;
+
             if (!Config.Instance.HEAT_GLOW_INDICATION)
             {
                 return;
@@ -127,6 +169,9 @@ namespace TSUT.HeatManagement
 
         public void InstantiateSteam(IMyCubeBlock block, float normalizedStrength = 1f)
         {
+            if (MyAPIGateway.Utilities.IsDedicated)
+                return;
+
             MyParticleEffect oldEffect;
             if (blocksAtSmoke.TryGetValue(block, out oldEffect))
             {
@@ -168,6 +213,9 @@ namespace TSUT.HeatManagement
 
         public void InstantiateSmoke(IMyCubeBlock block)
         {
+            if (MyAPIGateway.Utilities.IsDedicated)
+                return;
+
             MyParticleEffect effect;
             var position = block.GetPosition();
             MatrixD matrix = block.WorldMatrix;
