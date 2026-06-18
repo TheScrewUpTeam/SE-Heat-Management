@@ -13,6 +13,7 @@ namespace TSUT.HeatManagement
         private readonly List<IEventControllerEvent> _eventControllerEvents = new List<IEventControllerEvent>();
         private readonly List<Func<long, IDictionary<long, IDictionary<string, object>>>> _heatBehaviorProviders = new List<Func<long, IDictionary<long, IDictionary<string, object>>>>();
         private readonly List<Func<long, IDictionary<string, object>>> _heatMappers = new List<Func<long, IDictionary<string, object>>>();
+        private readonly Dictionary<long, IDictionary<string, object>> _directBlockBehaviors = new Dictionary<long, IDictionary<string, object>>();
 
         public void RegisterHeatBehaviorFactory(IHeatBehaviorFactory factory)
         {
@@ -65,6 +66,17 @@ namespace TSUT.HeatManagement
 
         public IEnumerable<Func<long, IDictionary<string, object>>> GetHeatMappers() {
             return _heatMappers;
+        }
+
+        public void RegisterDirectBlockBehavior(long blockId, IDictionary<string, object> behavior)
+        {
+            if (behavior == null) return;
+            _directBlockBehaviors[blockId] = behavior;
+        }
+
+        public IDictionary<long, IDictionary<string, object>> GetDirectBlockBehaviors()
+        {
+            return _directBlockBehaviors;
         }
     }
 }

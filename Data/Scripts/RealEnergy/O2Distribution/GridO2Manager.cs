@@ -1,4 +1,5 @@
 using Sandbox.ModAPI;
+using VRage.Utils;
 using System.Collections.Generic;
 using VRage.Game.ModAPI;
 using System.Linq;
@@ -11,7 +12,7 @@ using System;
 
 namespace TSUT.HeatManagement
 {
-    [MyEntityComponentDescriptor(typeof(MyObjectBuilder_CubeGrid), true)]
+    [MyEntityComponentDescriptor(typeof(MyObjectBuilder_CubeGrid), false)]
     public class GridO2Manager : MyGameLogicComponent
     {
         private IMyCubeGrid _grid;
@@ -75,8 +76,13 @@ namespace TSUT.HeatManagement
 
         public override void Init(MyObjectBuilder_EntityBase objectBuilder)
         {
-            // Commented as caused rover-antigravity problem, works without
-            // NeedsUpdate = MyEntityUpdateEnum.EACH_FRAME;
+            NeedsUpdate = MyEntityUpdateEnum.BEFORE_NEXT_FRAME;
+        }
+
+        public override void UpdateOnceBeforeFrame()
+        {
+            if (HeatSession.IsWheelGrid(Entity as IMyCubeGrid)) return;
+            NeedsUpdate = MyEntityUpdateEnum.EACH_FRAME;
         }
 
         public override void Close()
@@ -121,6 +127,8 @@ namespace TSUT.HeatManagement
             relevantBlocks.AddRange(thrusters);
             relevantBlocks.AddRange(engines);
 
+            HeatLog.Info($"Initialize: grid={grid.DisplayName}, generators={generators.Count}, vents={vents.Count}, farms={farms.Count}, tanks={tanks.Count}, hydrogen thrusters={thrusters.Count}, engines={engines.Count}", LS.O2, grid);
+
             // Create initial conveyor networks
             foreach (var block in relevantBlocks)
             {
@@ -129,10 +137,10 @@ namespace TSUT.HeatManagement
 
             _initialLoadPending = true;
             scheduledProcess = updateCounter + 180;
-            
+
+            HeatLog.Info($"Initialize: {blocksToProcess.Count} blocks queued, processing at tick {scheduledProcess}", LS.O2, grid);
             _isInitialized = true;
 
-            HeatSession.AttachO2GridManager(this, _grid);
         }
 
         private void OnBlockChanged(IMySlimBlock block)
@@ -193,6 +201,7 @@ namespace TSUT.HeatManagement
         private void ProcessScheduledBlocks()
         {
             if (!_isInitialized) return;
+            HeatLog.Info($"ProcessScheduledBlocks: {blocksToProcess.Count} blocks", LS.O2, _grid);
             foreach (var cubeBlock in blocksToProcess)
             {
                 if (blockToManager.ContainsKey(cubeBlock))
@@ -204,39 +213,33 @@ namespace TSUT.HeatManagement
                 foreach (var manager in blockToManager.Values.Distinct())
                 {
                     if (manager.IsConveyorConnected(cubeBlock))
-                    {
                         connectedManagers.Add(manager);
-                    }
                 }
-
 
                 if (connectedManagers.Count == 0)
                 {
-                    // No existing networks found, create new one
                     var newManager = new ConveyorManager(this);
                     newManager.TryAddBlock(cubeBlock);
                     blockToManager[cubeBlock] = newManager;
+                    HeatLog.Info($"  {cubeBlock.DisplayNameText} → new network", LS.O2, _grid);
                 }
                 else if (connectedManagers.Count == 1)
                 {
-                    // Add to single existing network
                     connectedManagers[0].TryAddBlock(cubeBlock);
                     blockToManager[cubeBlock] = connectedManagers[0];
+                    HeatLog.Info($"  {cubeBlock.DisplayNameText} → joined existing network ({connectedManagers[0].BlockCount} blocks)", LS.O2, _grid);
                 }
                 else
                 {
-                    // Multiple networks found, need to merge them
                     var targetManager = connectedManagers[0];
                     targetManager.TryAddBlock(cubeBlock);
                     blockToManager[cubeBlock] = targetManager;
-
-                    // Merge other networks into the target
                     foreach (var manager in connectedManagers.Skip(1))
-                    {
                         MergeNetworks(manager, targetManager);
-                    }
+                    HeatLog.Info($"  {cubeBlock.DisplayNameText} → merged {connectedManagers.Count} networks", LS.O2, _grid);
                 }
             }
+            HeatLog.Info($"ProcessScheduledBlocks done: {blockToManager.Values.Distinct().Count()} networks, {blockToManager.Count} blocks total", LS.O2, _grid);
         }
 
         private void OnBlockRemoved(IMySlimBlock block)
@@ -344,6 +347,13 @@ namespace TSUT.HeatManagement
                 return false;
             }
             return manager.HasEnough(amount, deltaTime);
+        }
+
+        public void ShowDebugGraph()
+        {
+            if (!_isInitialized) return;
+            foreach (var manager in blockToManager.Values.Distinct())
+                manager.ShowDebugGraph();
         }
 
         public bool IsValid => _isInitialized;

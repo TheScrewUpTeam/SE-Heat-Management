@@ -38,7 +38,6 @@ namespace TSUT.HeatManagement
 
     public interface IMultiBlockHeatBehavior : IHeatBehavior
     {
-        void RemoveBlock(IMyCubeBlock block, IGridHeatManager gridManager, Dictionary<IMyCubeBlock, IHeatBehavior> behaviorMap);
         void ShowDebugGraph(float deltaTime);
         void MarkDirty();
     }
@@ -62,6 +61,8 @@ namespace TSUT.HeatManagement
         IEnumerable<Func<long, IDictionary<long, IDictionary<string, object>>>> GetHeatBehaviorProviders();
         void RegisterHeatMapper(Func<long, IDictionary<string, object>> mapper);
         IEnumerable<Func<long, IDictionary<string, object>>> GetHeatMappers();
+        void RegisterDirectBlockBehavior(long blockId, IDictionary<string, object> behavior);
+        IDictionary<long, IDictionary<string, object>> GetDirectBlockBehaviors();
     }
 
     public interface IHeatUtils
@@ -106,7 +107,7 @@ namespace TSUT.HeatManagement
         void RemoveSmoke(IMyCubeBlock battery);
         void UpdateBlockHeatLight(IMyCubeBlock block, float heat);
         void UpdateLightsPosition();
-        void InstantiateSteam(IMyCubeBlock battery);
+        void InstantiateSteam(IMyCubeBlock battery, float normalizedStrength = 1f);
     }
 
     public interface IHeatApi

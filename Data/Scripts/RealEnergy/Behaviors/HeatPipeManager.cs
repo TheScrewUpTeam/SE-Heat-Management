@@ -24,7 +24,7 @@ namespace TSUT.HeatManagement
         public float Conductance = Config.Instance.HEATPIPE_CONDUCTIVITY * 100; // or resistance mult by 30 for faster heat expansion
     }
 
-    public class HeatPipeManagerFactory : IHeatBehaviorFactory
+    public class HeatPipeManagerFactory
     {
         public static readonly Dictionary<string, Base6Directions.Direction[]> PipeConnectionMap = new Dictionary<string, Base6Directions.Direction[]>()
         {
@@ -59,44 +59,6 @@ namespace TSUT.HeatManagement
         };
 
         private static readonly Dictionary<MyDefinitionId, bool> _pipeCandidateCache = new Dictionary<MyDefinitionId, bool>();
-
-        public void CollectHeatBehaviors(IMyCubeGrid grid, IGridHeatManager gridManager, IDictionary<IMyCubeBlock, IHeatBehavior> behaviorMap)
-        {
-            if (grid.CustomName.Contains(Config.HeatDebugString))
-            {
-                MyLog.Default.WriteLine($"[HeatManagement] Start collecting on {grid.DisplayName}...");
-            }
-
-            List<IMySlimBlock> slimBlocks = new List<IMySlimBlock>();
-            grid.GetBlocks(slimBlocks);
-
-            var pipeBlocks = slimBlocks
-                .Where(s => s.FatBlock != null && IsPipeCandidate(s.FatBlock))
-                .Select(s => s.FatBlock)
-                .ToList();
-
-            foreach (var pipe in pipeBlocks)
-            {
-                if (behaviorMap.ContainsKey(pipe))
-                    continue;
-
-                var result = OnBlockAdded(pipe, gridManager);
-
-                if (result.Behavior != null)
-                {
-                    foreach (var block in result.AffectedBlocks)
-                    {
-                        behaviorMap[block] = result.Behavior;
-                    }
-                }
-            }
-
-            if (grid.CustomName.Contains(Config.HeatDebugString))
-            {
-                MyLog.Default.WriteLine($"[HeatManagement] Grid {grid.DisplayName} processed. Networks created: {behaviorMap.Values.OfType<HeatPipeManager>().Distinct().Count()}");
-            }
-        }
-
 
         public static Base6Directions.Direction TransformDirection(MatrixI orientation, Base6Directions.Direction localDirection)
         {
@@ -207,9 +169,8 @@ namespace TSUT.HeatManagement
             return localPos.Z < 0 ? Base6Directions.Direction.Forward : Base6Directions.Direction.Backward;
         }
 
-        private static Base6Directions.Direction[] GetPipeDirections(IMyCubeBlock block, bool debug = false)
+        private static Base6Directions.Direction[] GetPipeDirections(IMyCubeBlock block)
         {
-
             Base6Directions.Direction[] dirs;
             // 1. Try dictionary (heat-only pipes, etc.)
             if (PipeConnectionMap.TryGetValue(block.BlockDefinition.SubtypeName, out dirs))
@@ -221,17 +182,11 @@ namespace TSUT.HeatManagement
 
             var result = new List<Base6Directions.Direction>();
 
-            if (debug)
-            {
-                MyLog.Default.WriteLine($"[HeatManagement] Checking dummies for {block.DisplayNameText}: {dummies.Count}");
-            }
+            HeatLog.Info($"Checking dummies for {block.DisplayNameText}: {dummies.Count}", LS.Pipe, block.CubeGrid);
 
             foreach (var kv in dummies)
             {
-                if (debug)
-                {
-                    MyLog.Default.WriteLine($"[HeatManagement] Dummy: {kv.Key}");
-                }
+                HeatLog.Info($"Dummy: {kv.Key}", LS.Pipe, block.CubeGrid);
                 var name = kv.Key.ToLower();
                 if (!name.Contains("conveyor"))
                 {
@@ -289,23 +244,17 @@ namespace TSUT.HeatManagement
             return result;
         }
 
-        public List<IMyCubeBlock> GetConnectedBlocks(IMyCubeBlock root)
+        public static List<IMyCubeBlock> GetConnectedBlocks(IMyCubeBlock root)
         {
-            if (root.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-            {
-                MyLog.Default.WriteLine($"[HeatManagement] Find connected from: {root.Position}");
-            }
+            HeatLog.Info($"Find connected from: {root.Position}", LS.Pipe, root.CubeGrid);
             var result = new List<IMyCubeBlock>();
 
             var grid = root.CubeGrid;
             var pos = root.Position;
-            var dirs = GetPipeDirections(root, root.CubeGrid.CustomName.Contains(Config.HeatDebugString));
+            var dirs = GetPipeDirections(root);
             var orientation = root.Orientation;
 
-            if (root.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-            {
-                MyLog.Default.WriteLine($"[HeatManagement] Directions to look: {dirs.Length}");
-            }
+            HeatLog.Info($"Directions to look: {dirs.Length}", LS.Pipe, root.CubeGrid);
 
             foreach (var dir in dirs)
             {
@@ -314,10 +263,7 @@ namespace TSUT.HeatManagement
                 var neighborPos = pos + Base6Directions.GetIntVector(gridDir);
 
                 var slim = grid.GetCubeBlock(neighborPos);
-                if (root.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-                {
-                    MyLog.Default.WriteLine($"[HeatManagement] Checking direction: {dir}, grid: {gridDir}, pos: {neighborPos}, found: {slim?.FatBlock != null}");
-                }
+                HeatLog.Info($"Checking direction: {dir}, grid: {gridDir}, pos: {neighborPos}, found: {slim?.FatBlock != null}", LS.Pipe, root.CubeGrid);
                 if (slim?.FatBlock == null)
                     continue;
 
@@ -330,171 +276,13 @@ namespace TSUT.HeatManagement
                 }
                 else
                 {
-                    if (root.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-                    {
-                        MyLog.Default.WriteLine($"[HeatManagement] Result: {root.DisplayNameText} -!> {neighbor.DisplayNameText}");
-                    }
+                    HeatLog.Info($"Result: {root.DisplayNameText} -!> {neighbor.DisplayNameText}", LS.Pipe, root.CubeGrid);
                 }
-
             }
 
             return result;
         }
 
-        public HeatBehaviorAttachResult OnBlockAdded(IMyCubeBlock block, IGridHeatManager gridManager)
-        {
-            if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-            {
-                MyLog.Default.WriteLine($"[HeatManagement] !!! New block on a grid: {block.BlockDefinition.SubtypeName}");
-            }
-            var result = new HeatBehaviorAttachResult();
-            var gridPipeManagers = gridManager.GetHeatPipeManagers();
-
-            if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-            {
-                MyLog.Default.WriteLine($"[HeatManagement] Managers on the grid: {gridPipeManagers.Count}");
-            }
-
-            if (!IsPipeCandidate(block))
-                return result;
-
-            if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-            {
-                MyLog.Default.WriteLine($"[HeatManagement] Type check: passed");
-            }
-
-            var grid = block.CubeGrid;
-            var pos = block.Position;
-
-            var connectedManagers = new List<HeatPipeManager>();
-            var neighborNodes = new Dictionary<HeatPipeNode, HeatPipeManager>();
-
-            if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-            {
-                MyLog.Default.WriteLine($"[HeatManagement] Looking for neighbors");
-            }
-
-            var connectedNeighbors = GetConnectedBlocks(block);
-
-            if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-            {
-                MyLog.Default.WriteLine($"[HeatManagement] Found {connectedNeighbors.Count}");
-            }
-
-            // 1. Check connected neighbors for existing networks
-            foreach (var cneighbor in connectedNeighbors)
-            {
-                if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-                {
-                    MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] >> Found neighbor: {cneighbor.DisplayNameText}");
-                }
-
-                foreach (var manager in gridPipeManagers)
-                {
-                    if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-                    {
-                        MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] >> Nodes in manager: {manager.Nodes.Count}");
-                    }
-                    HeatPipeNode node = manager.TryGetNode(cneighbor);
-                    if (node == null)
-                        continue;
-
-                    if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-                    {
-                        MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] >> Found node");
-                    }
-
-                    if (ArePipesConnectedByGeometry(block, cneighbor))
-                    {
-                        if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-                        {
-                            MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] >> Connectable, add node");
-                        }
-                        connectedManagers.Add(manager);
-                        neighborNodes[node] = manager;
-                    }
-                }
-            }
-
-            if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-            {
-                MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] Found managers: {connectedManagers.Count}, nodes: {neighborNodes.Count}");
-            }
-
-            // 2. Create new node
-            var newNode = new HeatPipeNode { Block = block };
-
-            // 3. If no connections — create a new manager
-            if (connectedManagers.Count == 0)
-            {
-                if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-                {
-                    MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] New network created");
-                }
-                var newManager = new HeatPipeManager(gridManager);
-                newManager.TryAddNode(newNode);
-                gridPipeManagers.Add(newManager);
-                result.Behavior = newManager;
-                result.AffectedBlocks = new List<IMyCubeBlock> { block };
-                return result;
-            }
-
-            // 4. If one manager — just add node to it
-            if (connectedManagers.Count == 1)
-            {
-                if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-                {
-                    MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] Existing network extended");
-                }
-                var manager = connectedManagers.First();
-                foreach (var kvp in neighborNodes)
-                {
-                    manager.TryConnectNodes(newNode, kvp.Key);
-                }
-                result.Behavior = manager;
-                result.AffectedBlocks = new List<IMyCubeBlock> { block };
-                return result;
-            }
-
-            // 5. Multiple managers: merge them
-            var mergedManager = new HeatPipeManager(gridManager);
-            // Migrate from all old managers
-            foreach (var mgr in connectedManagers)
-            {
-                foreach (var node in mgr.Nodes)
-                {
-                    mergedManager.TryAddNode(node);
-
-                    foreach (var edge in node.Connections)
-                    {
-                        // Add each connection only once (A < B)
-                        if (edge.A == node && mergedManager.ContainsNode(edge.B))
-                            mergedManager.TryConnectNodes(edge.A, edge.B);
-                    }
-                }
-            }
-
-            // Link new node to neighbor nodes
-            foreach (var kvp in neighborNodes)
-            {
-                mergedManager.TryConnectNodes(newNode, kvp.Key);
-            }
-
-            result.Behavior = mergedManager;
-            result.AffectedBlocks = mergedManager.Nodes.Select(n => n.Block).ToList();
-            if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-            {
-                MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] Several managers merged, new manager with {mergedManager.Nodes.Count} created");
-            }
-            return result;
-        }
-
-        public void RegisterCustomControls()
-        {
-            // Not needed
-        }
-
-        public int Priority => 15; // Between batteries and vents
     }
 
     public class HeatPipeManager : IHeatBehavior, IMultiBlockHeatBehavior
@@ -622,52 +410,33 @@ namespace TSUT.HeatManagement
                     a.Connections.Add(edge);
                     b.Connections.Add(edge);
                 }
-                if (a.Block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-                {
-                    MyLog.Default.WriteLine($"[HeatManagement] Both nodes here: connected");
-                }
+                HeatLog.Info("Both nodes here: connected", LS.Pipe, a.Block.CubeGrid);
                 return true;
             }
 
             if (_nodes.Contains(a))
             {
-                if (a.Block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-                {
-                    MyLog.Default.WriteLine($"[HeatManagement] First node here");
-                }
+                HeatLog.Info("First node here", LS.Pipe, a.Block.CubeGrid);
                 if (!TryAddNode(b)) return false;
                 var edge = new HeatPipeEdge { A = a, B = b };
                 a.Connections.Add(edge);
                 b.Connections.Add(edge);
-                if (a.Block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-                {
-                    MyLog.Default.WriteLine($"[HeatManagement] First node here: connected");
-                }
+                HeatLog.Info("First node here: connected", LS.Pipe, a.Block.CubeGrid);
                 return true;
             }
 
             if (_nodes.Contains(b))
             {
-                if (b.Block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-                {
-                    MyLog.Default.WriteLine($"[HeatManagement] Second node here");
-                }
+                HeatLog.Info("Second node here", LS.Pipe, b.Block.CubeGrid);
                 if (!TryAddNode(a)) return false;
                 var edge = new HeatPipeEdge { A = a, B = b };
                 a.Connections.Add(edge);
                 b.Connections.Add(edge);
-                if (b.Block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-                {
-                    MyLog.Default.WriteLine($"[HeatManagement] Second node here: connected");
-                }
+                HeatLog.Info("Second node here: connected", LS.Pipe, b.Block.CubeGrid);
                 return true;
             }
 
-            if (a.Block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-            {
-                MyLog.Default.WriteLine($"[HeatManagement] No node found");
-            }
-
+            HeatLog.Info("No node found", LS.Pipe, a.Block.CubeGrid);
             return false;
         }
 
@@ -783,9 +552,7 @@ namespace TSUT.HeatManagement
             int endIdx = Math.Min(startIdx + nodesPerSegment, _nodes.Count);
             
             var segmentNodes = _nodes.Skip(startIdx).Take(endIdx - startIdx);
-            if (_nodes.First().Block.CubeGrid.CustomName.Contains(Config.HeatDebugString)) {
-                MyLog.Default.WriteLine($"[HeatManagement] HeatPipe #{GetHashCode()} ({_nodes.Count}) processing segment {_currentSegment + 1}/{totalSegments} with {_accumulatedTime:F3}s accumulated time, nodes {startIdx}-{endIdx - 1}");
-            }
+            HeatLog.Info($"HeatPipe #{GetHashCode()} ({_nodes.Count}) processing segment {_currentSegment + 1}/{totalSegments} with {_accumulatedTime:F3}s accumulated time, nodes {startIdx}-{endIdx - 1}", LS.Pipe, _nodes.First().Block?.CubeGrid);
 
             // Process segment using accumulated time
             ProcessSegment(segmentNodes, _accumulatedTime);
@@ -849,76 +616,50 @@ namespace TSUT.HeatManagement
             info.AppendLine($"- #{GetHashCode()} Length: {nodeCount}, Avg: {avgTemp:F1} °C");
         }
 
-        public void RemoveBlock(IMyCubeBlock block, IGridHeatManager gridManager, Dictionary<IMyCubeBlock, IHeatBehavior> behaviorMap)
+        public List<HeatPipeManager> RemoveNode(IMyCubeBlock block)
         {
-            if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-            {
-                MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] !! Block removed {block.DisplayNameText}");
-            }
+            HeatLog.Info($"RemoveNode: {block.DisplayNameText}", LS.Pipe, block.CubeGrid);
+
             var node = _nodes.FirstOrDefault(n => n.Block == block);
             if (node == null)
-                return;
+                return new List<HeatPipeManager>();
 
-            if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-            {
-                MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] Connections to remove {node.Connections.Count}");
-            }
-            // 1. Remove connected edges
+            HeatLog.Info($"RemoveNode: removing {node.Connections.Count} edges", LS.Pipe, block.CubeGrid);
+
             foreach (var edge in node.Connections)
             {
                 var other = edge.A == node ? edge.B : edge.A;
                 other.Connections.Remove(edge);
             }
-
             _nodes.Remove(node);
-            behaviorMap.Remove(node.Block);
 
-            if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-            {
-                MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] Nodes left {_nodes.Count}");
-            }
+            HeatLog.Info($"RemoveNode: {_nodes.Count} nodes remain", LS.Pipe, block.CubeGrid);
 
-            // 2. If only one node remains → just keep it
-            if (_nodes.Count <= 1)
-                return;
+            if (_nodes.Count == 0)
+                return new List<HeatPipeManager>();
 
-            // 3. Recompute sub-networks (connected graphs)
+            if (_nodes.Count == 1)
+                return new List<HeatPipeManager> { this };
+
             var subgraphs = DiscoverSubgraphsWithEdges();
 
-            if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-            {
-                MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] Subgraphs discovered {subgraphs.Count}");
-            }
+            HeatLog.Info($"RemoveNode: {subgraphs.Count} subgraphs", LS.Pipe, block.CubeGrid);
 
             if (subgraphs.Count <= 1)
-                return;
+                return new List<HeatPipeManager> { this };
 
-            int created = 0;
-
+            var result = new List<HeatPipeManager>();
             foreach (var sub in subgraphs)
             {
-                created++;
-                var newManager = new HeatPipeManager(gridManager);
-                if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-                {
-                    MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] Creating new network with {sub.Nodes.Count} nodes and {sub.Edges.Count} edges");
-                }
+                HeatLog.Info($"RemoveNode: creating subgraph with {sub.Nodes.Count} nodes, {sub.Edges.Count} edges", LS.Pipe, block.CubeGrid);
+                var newManager = new HeatPipeManager(_gridManager);
                 foreach (var n in sub.Nodes)
                     newManager.TryAddNode(n);
-
                 foreach (var edge in sub.Edges)
                     newManager.TryConnectNodes(edge.A, edge.B);
-
-                foreach (var n in sub.Nodes)
-                    behaviorMap[n.Block] = newManager;
+                result.Add(newManager);
             }
-
-            if (block.CubeGrid.CustomName.Contains(Config.HeatDebugString))
-            {
-                MyLog.Default.WriteLine($"[HeatManagement,OnBlockAdded] Networks created {created}");
-            }
-
-            return;
+            return result;
         }
 
         private List<HeatPipeSubgraph> DiscoverSubgraphsWithEdges()

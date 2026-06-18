@@ -12,7 +12,6 @@ using VRage.Game.ObjectBuilders.ComponentSystem;
 namespace TSUT.HeatManagement
 {
     [MyComponentBuilder(typeof(ObjectBuilderGridHeat))]
-    [MyComponentType(typeof(ObjectBuilderGridHeat))]
     [MyEntityDependencyType(typeof(IMyEventControllerBlock))]
     public class GridMaxTemperatureChanged : MyEventProxyEntityComponent, IMyEventComponentWithGui, IEventControllerEvent
     {
@@ -128,8 +127,8 @@ namespace TSUT.HeatManagement
             float threshold = _temperatureThreshold;
             bool isBelow = EventController.IsLowerOrEqualCondition;
             IMyCubeGrid grid = EventController.CubeGrid;
-            GridHeatManager gridHeatManager;
-            HeatSession.GetGridHeatManager(grid, out gridHeatManager);
+            GridHeatComponent gridHeatManager;
+            HeatSession.TryGetGridHeatManager(grid, out gridHeatManager);
 
             bool result;
             float currentTemperature = gridHeatManager.GetMaxTemperature();
@@ -166,8 +165,8 @@ namespace TSUT.HeatManagement
             info.AppendFormat(MyTexts.GetString(MySpaceTexts.EventThresholdInfo), treshholdValue, "°C");
             info.AppendLine();
             IMyCubeGrid grid = EventController.CubeGrid;
-            GridHeatManager gridHeatManager;
-            HeatSession.GetGridHeatManager(grid, out gridHeatManager);
+            GridHeatComponent gridHeatManager;
+            HeatSession.TryGetGridHeatManager(grid, out gridHeatManager);
             var num = gridHeatManager.GetMaxTemperature();
             var blockInput = num.ToString("F1");
             info.AppendFormat(MyTexts.GetString(MySpaceTexts.EventBlockInputInfo), grid.CustomName, blockInput, "°C");
