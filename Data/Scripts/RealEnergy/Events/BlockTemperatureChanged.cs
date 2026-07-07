@@ -89,9 +89,9 @@ namespace TSUT.HeatManagement
         public override void Deserialize(MyObjectBuilder_ComponentBase builder)
         {
             base.Deserialize(builder);
-            var customBuilder = (ObjectBuilderHeat)builder;
-
-            _temperatureThreshold = customBuilder.Threshold;
+            var customBuilder = builder as ObjectBuilderHeat;
+            if (customBuilder != null)
+                _temperatureThreshold = customBuilder.Threshold;
         }
 
         public override bool IsSerialized()

@@ -68,9 +68,12 @@ namespace TSUT.HeatManagement
 
         private void OnHeatApiRequested(object obj)
         {
-            var shareable = ConvertApiToShareable(_heatApi);
-            MyAPIGateway.Utilities.SendModMessage(HmsApi.HeatApiMessageId, shareable);
-            HeatLog.Info("HeatAPI resent on request.", LS.Grid);
+            MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+            {
+                var shareable = ConvertApiToShareable(_heatApi);
+                MyAPIGateway.Utilities.SendModMessage(HmsApi.HeatApiMessageId, shareable);
+                HeatLog.Info("HeatAPI resent on request.", LS.Grid);
+            });
         }
 
         private void OnHeatProviderRegister(object obj)

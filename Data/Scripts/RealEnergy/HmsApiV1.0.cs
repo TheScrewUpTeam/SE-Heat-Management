@@ -38,7 +38,7 @@ namespace TSUT.HeatManagement
             {
                 // Already initialized — fire immediately if ready, otherwise queue the callback
                 if (_instance._isApiReceived)
-                    onReady?.Invoke();
+                    MyAPIGateway.Utilities.InvokeOnGameThread(() => onReady?.Invoke());
                 else
                     _instance._onReady += onReady;
                 return;
@@ -46,7 +46,8 @@ namespace TSUT.HeatManagement
             _instance = this;
             _onReady = onReady;
             MyAPIGateway.Utilities.RegisterMessageHandler(HeatApiMessageId, OnApiReceived);
-            MyAPIGateway.Utilities.SendModMessage(HeatApiRequestMessageId, null);
+            MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                MyAPIGateway.Utilities.SendModMessage(HeatApiRequestMessageId, null));
         }
 
         private void OnApiReceived(object obj)
@@ -56,7 +57,8 @@ namespace TSUT.HeatManagement
             if (!_isApiReceived)
             {
                 _isApiReceived = true;
-                _onReady?.Invoke();
+                var cb = _onReady;
+                MyAPIGateway.Utilities.InvokeOnGameThread(() => cb?.Invoke());
             }
         }
 
