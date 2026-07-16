@@ -50,11 +50,12 @@ namespace TSUT.HeatManagement
 
         public static float GetO2Turbo(IMyCubeBlock block)
         {
-            if ((block as IMyAirVent).CanPressurize)
+            var vent = block as IMyAirVent;
+            if (vent == null || vent.CanPressurize)
                 return 0f;
 
             string turboStr;
-            if (block.Storage.TryGetValue(Config.O2TurboKey, out turboStr))
+            if (block.Storage != null && block.Storage.TryGetValue(Config.O2TurboKey, out turboStr))
             {
                 float value;
                 if (float.TryParse(turboStr, out value) && !float.IsNaN(value) && !float.IsInfinity(value))
