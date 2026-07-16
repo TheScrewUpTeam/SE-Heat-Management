@@ -648,6 +648,7 @@ namespace TSUT.HeatManagement
                 _pendingRegistration.Clear();
                 foreach (var comp in pending)
                 {
+                    if (comp.Block?.CubeGrid?.Physics == null) continue; // projected/preview block, not a real placed block
                     if (!comp.IsAllowedGrid()) continue;
                     comp.OnHmsInit();
                     comp.RegisterWithHms();
@@ -663,6 +664,7 @@ namespace TSUT.HeatManagement
             public sealed override void UpdateOnceBeforeFrame()
             {
                 base.UpdateOnceBeforeFrame();
+                if (Block?.CubeGrid?.Physics == null) return; // projected/preview block, not a real placed block
                 EnsureApi();
                 if (_sharedApi.Utils != null)
                 {
