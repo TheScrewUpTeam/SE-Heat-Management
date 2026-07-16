@@ -43,7 +43,10 @@ namespace TSUT.HeatManagement
         public override void UpdateOnceBeforeFrame()
         {
             base.UpdateOnceBeforeFrame();
-            _gridHeatComponent = ((IMyCubeBlock)Entity).CubeGrid.GameLogic.GetAs<GridHeatComponent>();
+            var grid = ((IMyCubeBlock)Entity).CubeGrid;
+            _gridHeatComponent = grid.GameLogic.GetAs<GridHeatComponent>();
+            if (_gridHeatComponent == null)
+                HeatSession.TryGetGridHeatManager(grid, out _gridHeatComponent);
             _gridHeatComponent?.RegisterBehavior((IMyCubeBlock)Entity, this);
             _initialized = true;
             OnAttachedToScene();
@@ -53,7 +56,10 @@ namespace TSUT.HeatManagement
         {
             base.OnAddedToScene();
             if (!_initialized) return;
-            var newGrid = ((IMyCubeBlock)Entity).CubeGrid.GameLogic.GetAs<GridHeatComponent>();
+            var cubeGrid = ((IMyCubeBlock)Entity).CubeGrid;
+            var newGrid = cubeGrid.GameLogic.GetAs<GridHeatComponent>();
+            if (newGrid == null)
+                HeatSession.TryGetGridHeatManager(cubeGrid, out newGrid);
             if (newGrid == _gridHeatComponent) return;
             _gridHeatComponent?.UnregisterBehavior((IMyCubeBlock)Entity);
             _gridHeatComponent = newGrid;

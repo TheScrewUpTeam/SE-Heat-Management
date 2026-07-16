@@ -141,6 +141,7 @@ namespace TSUT.HeatManagement
             HeatLog.Info($"Initialize: {blocksToProcess.Count} blocks queued, processing at tick {scheduledProcess}", LS.O2, grid);
             _isInitialized = true;
 
+            HeatSession.RegisterO2Manager(grid.EntityId, this);
         }
 
         private void OnBlockChanged(IMySlimBlock block)
@@ -318,6 +319,9 @@ namespace TSUT.HeatManagement
         public void Invalidate()
         {
             if (!_isInitialized) return;
+
+            if (_grid != null)
+                HeatSession.UnregisterO2Manager(_grid.EntityId);
 
             _grid.OnBlockAdded -= OnBlockAdded;
             _grid.OnBlockRemoved -= OnBlockRemoved;

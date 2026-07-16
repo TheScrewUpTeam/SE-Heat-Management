@@ -27,7 +27,18 @@ namespace TSUT.HeatManagement
         private bool _active = false;
         private bool _isInitialized = false;
         private GridO2Manager _o2Manager = null;
-        private GridO2Manager O2Manager => _o2Manager ?? (_o2Manager = Entity?.GameLogic.GetAs<GridO2Manager>());
+        // Fallback for when another mod clobbers Entity.GameLogic on this grid (e.g. via raw
+        // Components.Add() instead of the composite-safe registration path); GetAs<GridO2Manager>()
+        // then permanently returns null even though the component is alive and ticking.
+        private GridO2Manager O2Manager => _o2Manager ?? (_o2Manager = ResolveO2Manager());
+
+        private GridO2Manager ResolveO2Manager()
+        {
+            var found = Entity?.GameLogic.GetAs<GridO2Manager>();
+            if (found == null)
+                HeatSession.TryGetO2Manager(_grid, out found);
+            return found;
+        }
 
         // ===== SE component lifecycle =====
 
@@ -79,7 +90,7 @@ namespace TSUT.HeatManagement
             SubscribeToOwnershipChanges();
             EvaluateActive();
 
-            _o2Manager = Entity?.GameLogic?.GetAs<GridO2Manager>();
+            _o2Manager = ResolveO2Manager();
             HeatSession.RegisterGridComponent(grid.EntityId, this);
             _isInitialized = true;
             HeatLog.Info($"GridHeatComponent initialized for {grid.DisplayName} ({grid.EntityId}). Active: {_active}", LS.Grid, grid);

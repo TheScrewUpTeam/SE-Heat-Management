@@ -98,6 +98,8 @@ namespace TSUT.HeatManagement
             {
                 foreach (var neighbor in neighborList)
                 {
+                    if (neighbor.FatBlock == null)
+                        continue;
                     var behavior = HeatSession.GetBehaviorForBlock(neighbor.FatBlock);
                     if (behavior != null && behavior is HeatPipeManager)
                     {

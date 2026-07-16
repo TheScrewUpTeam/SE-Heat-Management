@@ -36,6 +36,12 @@ namespace TSUT.HeatManagement
         private static Dictionary<long, IHeatBehavior> _trackedNetworkBlocks = new Dictionary<long, IHeatBehavior>();
         private static readonly Dictionary<long, GridHeatComponent> _gridComponentCache = new Dictionary<long, GridHeatComponent>();
 
+        // Fallback cache for when another mod clobbers Entity.GameLogic on a grid (e.g. via raw
+        // Components.Add() instead of the composite-safe registration path), which makes
+        // grid.GameLogic.GetAs<GridO2Manager>() permanently return null even though the component
+        // is alive and ticking.
+        private static readonly Dictionary<long, GridO2Manager> _o2ManagerCache = new Dictionary<long, GridO2Manager>();
+
         public static void RegisterGridComponent(long entityId, GridHeatComponent component)
         {
             _gridComponentCache[entityId] = component;
@@ -44,6 +50,22 @@ namespace TSUT.HeatManagement
         public static void UnregisterGridComponent(long entityId)
         {
             _gridComponentCache.Remove(entityId);
+        }
+
+        public static void RegisterO2Manager(long entityId, GridO2Manager component)
+        {
+            _o2ManagerCache[entityId] = component;
+        }
+
+        public static void UnregisterO2Manager(long entityId)
+        {
+            _o2ManagerCache.Remove(entityId);
+        }
+
+        public static bool TryGetO2Manager(IMyCubeGrid grid, out GridO2Manager manager)
+        {
+            manager = null;
+            return grid != null && _o2ManagerCache.TryGetValue(grid.EntityId, out manager);
         }
 
         public static Config Config;
