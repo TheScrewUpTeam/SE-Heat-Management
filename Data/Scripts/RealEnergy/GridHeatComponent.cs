@@ -26,38 +26,55 @@ namespace TSUT.HeatManagement
         private float _neighborsTimeAccumulator = 0f;
         private bool _active = false;
         private bool _isInitialized = false;
+        private bool _skip = false;
         private GridO2Manager _o2Manager = null;
-        // Fallback for when another mod clobbers Entity.GameLogic on this grid (e.g. via raw
-        // Components.Add() instead of the composite-safe registration path); GetAs<GridO2Manager>()
-        // then permanently returns null even though the component is alive and ticking.
+
+        // Registration (AttachTo) and ticking are driven by HeatSession, not by the engine's GameLogic
+        // dispatch - other mods can steal entity.GameLogic before the engine ever calls Init() on us.
+        internal bool IsInitialized => _isInitialized;
+        internal bool IsSkipped => _skip;
         private GridO2Manager O2Manager => _o2Manager ?? (_o2Manager = ResolveO2Manager());
 
         private GridO2Manager ResolveO2Manager()
         {
-            var found = Entity?.GameLogic.GetAs<GridO2Manager>();
-            if (found == null)
-                HeatSession.TryGetO2Manager(_grid, out found);
+            GridO2Manager found;
+            HeatSession.TryGetO2Manager(_grid, out found);
             return found;
         }
 
         // ===== SE component lifecycle =====
 
+        // Best-effort path, in case nothing else clobbered the GameLogic slot; AttachTo is idempotent.
         public override void Init(MyObjectBuilder_EntityBase objectBuilder)
         {
-            NeedsUpdate |= MyEntityUpdateEnum.BEFORE_NEXT_FRAME;
+            AttachTo(Entity as IMyCubeGrid);
         }
 
-        public override void UpdateOnceBeforeFrame()
+        internal void AttachTo(IMyCubeGrid grid)
         {
-            var grid = Entity as IMyCubeGrid;
-            if (grid == null || HeatSession.IsWheelGrid(grid)) return;
-            Initialize(grid);
-            NeedsUpdate |= MyEntityUpdateEnum.EACH_FRAME;
+            if (_grid != null || grid == null)
+                return;
+
+            _grid = grid;
+            _grid.OnClose += HandleGridClosed;
+            HeatSession.RegisterGridComponent(_grid.EntityId, this);
         }
 
-        public override void UpdateAfterSimulation()
+        // Called from HeatSession.UpdateBeforeSimulation, once, in place of UpdateOnceBeforeFrame.
+        internal void TickInitialize()
         {
-            base.UpdateAfterSimulation();
+            if (_grid == null || HeatSession.IsWheelGrid(_grid))
+            {
+                _skip = true;
+                _isInitialized = true;
+                return;
+            }
+            Initialize(_grid);
+        }
+
+        // Called from HeatSession.UpdateBeforeSimulation every frame, in place of UpdateAfterSimulation.
+        internal void TickAfterSimulation()
+        {
             UpdateVisuals(MyEngineConstants.UPDATE_STEP_SIZE_IN_SECONDS);
 
             if (!MyAPIGateway.Multiplayer.IsServer || !_active)
@@ -69,6 +86,11 @@ namespace TSUT.HeatManagement
             float deltaTime = Config.Instance.MAIN_UPDATE_INTERVAL_TICKS * MyEngineConstants.UPDATE_STEP_SIZE_IN_SECONDS;
             UpdateBlocksTemp(deltaTime);
             UpdateNeighborsTemp(deltaTime);
+        }
+
+        private void HandleGridClosed(IMyEntity entity)
+        {
+            Cleanup();
         }
 
         public override void Close()
@@ -91,7 +113,6 @@ namespace TSUT.HeatManagement
             EvaluateActive();
 
             _o2Manager = ResolveO2Manager();
-            HeatSession.RegisterGridComponent(grid.EntityId, this);
             _isInitialized = true;
             HeatLog.Info($"GridHeatComponent initialized for {grid.DisplayName} ({grid.EntityId}). Active: {_active}", LS.Grid, grid);
         }
@@ -465,7 +486,8 @@ namespace TSUT.HeatManagement
 
         public void Cleanup()
         {
-            HeatSession.UnregisterGridComponent(Entity.EntityId);
+            if (_grid != null)
+                HeatSession.UnregisterGridComponent(_grid.EntityId);
             foreach (var kvp in _heatBehaviors)
             {
                 try { kvp.Value.Cleanup(); }
@@ -479,6 +501,7 @@ namespace TSUT.HeatManagement
                 _grid.OnBlockAdded -= OnBlockAdded;
                 _grid.OnBlockRemoved -= OnBlockRemoved;
                 _grid.OnBlockIntegrityChanged -= OnBlockIntegrityChanged;
+                _grid.OnClose -= HandleGridClosed;
             }
 
             foreach (var block in _ownershipSubscribedBlocks)

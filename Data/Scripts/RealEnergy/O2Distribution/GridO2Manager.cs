@@ -19,6 +19,7 @@ namespace TSUT.HeatManagement
         private readonly Dictionary<IMyCubeBlock, ConveyorManager> blockToManager = new Dictionary<IMyCubeBlock, ConveyorManager>();
         private readonly Dictionary<IMyCubeBlock, IManagedBlock> managedBlocks = new Dictionary<IMyCubeBlock, IManagedBlock>();
         private bool _isInitialized = false;
+        private bool _skip = false;
         private bool _initialLoadPending = false;
         private int updateCounter = 0;
         private int scheduledProcess = 0;
@@ -74,15 +75,56 @@ namespace TSUT.HeatManagement
             }
         }
 
+        // Same as GridHeatComponent: registration/ticking driven by HeatSession, not engine dispatch.
+        internal bool IsInitialized => _isInitialized;
+        internal bool IsSkipped => _skip;
+
         public override void Init(MyObjectBuilder_EntityBase objectBuilder)
         {
-            NeedsUpdate = MyEntityUpdateEnum.BEFORE_NEXT_FRAME;
+            AttachTo(Entity as IMyCubeGrid);
         }
 
-        public override void UpdateOnceBeforeFrame()
+        internal void AttachTo(IMyCubeGrid grid)
         {
-            if (HeatSession.IsWheelGrid(Entity as IMyCubeGrid)) return;
-            NeedsUpdate = MyEntityUpdateEnum.EACH_FRAME;
+            if (_grid != null || grid == null)
+                return;
+
+            _grid = grid;
+            _grid.OnClose += HandleGridClosed;
+            HeatSession.RegisterO2Manager(_grid.EntityId, this);
+        }
+
+        // Called from HeatSession.UpdateBeforeSimulation, once, in place of UpdateOnceBeforeFrame.
+        internal void TickInitialize()
+        {
+            if (_grid == null || HeatSession.IsWheelGrid(_grid))
+            {
+                _skip = true;
+                _isInitialized = true;
+                return;
+            }
+            Initialize(_grid);
+        }
+
+        // Called from HeatSession.UpdateBeforeSimulation every frame, in place of UpdateAfterSimulation.
+        internal void TickAfterSimulation()
+        {
+            if (_initialLoadPending && scheduledProcess > 0 && updateCounter >= scheduledProcess)
+            {
+                ProcessScheduledBlocks();
+                blocksToProcess.Clear();
+                scheduledProcess = 0;
+            }
+            updateCounter++;
+            if (updateCounter % Config.Instance.MAIN_UPDATE_INTERVAL_TICKS != 0) return;
+            var deltaTime = (updateCounter - lastUpdate) * MyEngineConstants.UPDATE_STEP_SIZE_IN_SECONDS;
+            Update(deltaTime);
+            lastUpdate = updateCounter;
+        }
+
+        private void HandleGridClosed(IMyEntity entity)
+        {
+            Invalidate();
         }
 
         public override void Close()
@@ -140,8 +182,6 @@ namespace TSUT.HeatManagement
 
             HeatLog.Info($"Initialize: {blocksToProcess.Count} blocks queued, processing at tick {scheduledProcess}", LS.O2, grid);
             _isInitialized = true;
-
-            HeatSession.RegisterO2Manager(grid.EntityId, this);
         }
 
         private void OnBlockChanged(IMySlimBlock block)
@@ -156,31 +196,6 @@ namespace TSUT.HeatManagement
             {
                 OnBlockRemoved(block);
             }
-        }
-
-        public override void UpdateAfterSimulation()
-        {
-            base.UpdateAfterSimulation();
-            if (HeatSession.IsWheelGrid(Entity as IMyCubeGrid))
-            {
-                return;
-            }
-            if (!_isInitialized)
-            {
-                Initialize(Entity as IMyCubeGrid);
-                return;
-            }
-            if (_initialLoadPending && scheduledProcess > 0 && updateCounter >= scheduledProcess)
-            {
-                ProcessScheduledBlocks();
-                blocksToProcess.Clear();
-                scheduledProcess = 0;
-            }
-            updateCounter++;
-            if (updateCounter % Config.Instance.MAIN_UPDATE_INTERVAL_TICKS != 0) return;
-            var deltaTime = (updateCounter - lastUpdate) * MyEngineConstants.UPDATE_STEP_SIZE_IN_SECONDS;
-            Update(deltaTime);
-            lastUpdate = updateCounter;
         }
 
         private void OnBlockAdded(IMySlimBlock block)
@@ -318,13 +333,18 @@ namespace TSUT.HeatManagement
 
         public void Invalidate()
         {
-            if (!_isInitialized) return;
-
+            // Hooks/registration happen in AttachTo regardless of _isInitialized, so must be torn
+            // down unconditionally too.
             if (_grid != null)
+            {
                 HeatSession.UnregisterO2Manager(_grid.EntityId);
+                _grid.OnBlockAdded -= OnBlockAdded;
+                _grid.OnBlockRemoved -= OnBlockRemoved;
+                _grid.OnBlockIntegrityChanged -= OnBlockChanged;
+                _grid.OnClose -= HandleGridClosed;
+            }
 
-            _grid.OnBlockAdded -= OnBlockAdded;
-            _grid.OnBlockRemoved -= OnBlockRemoved;
+            if (!_isInitialized) return;
 
             foreach (var manager in blockToManager.Values)
             {

@@ -86,6 +86,8 @@ namespace TSUT.HeatManagement
             MyAPIGateway.Utilities.SendModMessage(HmsApi.HeatApiMessageId, shareable);
             HeatLog.Info("HeatAPI populated.", LS.Grid);
             _commandsInstance = HeatCommands.Instance; // Initialize commands
+
+            MyAPIGateway.Entities.OnEntityAdd += OnEntityAdd;
         }
 
         private void OnHeatApiRequested(object obj)
@@ -151,6 +153,7 @@ namespace TSUT.HeatManagement
             networking?.Unregister();
             MyAPIGateway.Utilities.UnregisterMessageHandler(HmsApi.HeatProviderMesageId, OnHeatProviderRegister);
             MyAPIGateway.Utilities.UnregisterMessageHandler(HmsApi.HeatApiRequestMessageId, OnHeatApiRequested);
+            MyAPIGateway.Entities.OnEntityAdd -= OnEntityAdd;
             _gridComponentCache.Clear();
         }
 
@@ -163,13 +166,72 @@ namespace TSUT.HeatManagement
             RegisterCustomControls();
 
             networking.SendToServer(new RequestHeatConfig());
+
+            // Catch grids that were already created before our OnEntityAdd subscription went live.
+            var existingEntities = new HashSet<IMyEntity>();
+            MyAPIGateway.Entities.GetEntities(existingEntities, e => e is IMyCubeGrid);
+            foreach (var entity in existingEntities)
+            {
+                var grid = (IMyCubeGrid)entity;
+                EnsureGridComponent(grid);
+                EnsureO2Manager(grid);
+            }
+        }
+
+        private void OnEntityAdd(IMyEntity entity)
+        {
+            var grid = entity as IMyCubeGrid;
+            if (grid == null)
+                return;
+            EnsureGridComponent(grid);
+            EnsureO2Manager(grid);
+        }
+
+        internal static void EnsureGridComponent(IMyCubeGrid grid)
+        {
+            if (grid == null || _gridComponentCache.ContainsKey(grid.EntityId))
+                return;
+            var component = new GridHeatComponent();
+            component.AttachTo(grid);
+        }
+
+        internal static void EnsureO2Manager(IMyCubeGrid grid)
+        {
+            if (grid == null || _o2ManagerCache.ContainsKey(grid.EntityId))
+                return;
+            var component = new GridO2Manager();
+            component.AttachTo(grid);
         }
 
 
         public override void UpdateBeforeSimulation()
         {
             ClientSideUpdates();
+            TickGridComponents();
+            TickO2Managers();
             _tickCount++;
+        }
+
+        private void TickGridComponents()
+        {
+            foreach (var component in new List<GridHeatComponent>(_gridComponentCache.Values))
+            {
+                if (!component.IsInitialized)
+                    component.TickInitialize();
+                else if (!component.IsSkipped)
+                    component.TickAfterSimulation();
+            }
+        }
+
+        private void TickO2Managers()
+        {
+            foreach (var component in new List<GridO2Manager>(_o2ManagerCache.Values))
+            {
+                if (!component.IsInitialized)
+                    component.TickInitialize();
+                else if (!component.IsSkipped)
+                    component.TickAfterSimulation();
+            }
         }
 
         private IMyHudNotification _debugHud;
