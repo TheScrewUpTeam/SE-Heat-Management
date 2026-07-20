@@ -97,7 +97,25 @@ namespace TSUT.HeatManagement
         // Called from HeatSession.UpdateBeforeSimulation, once, in place of UpdateOnceBeforeFrame.
         internal void TickInitialize()
         {
-            if (_grid == null || HeatSession.IsWheelGrid(_grid))
+            if (_grid == null)
+            {
+                _skip = true;
+                _isInitialized = true;
+                return;
+            }
+
+            bool isWheelGrid;
+            try
+            {
+                isWheelGrid = HeatSession.IsWheelGrid(_grid);
+            }
+            catch (InvalidOperationException)
+            {
+                // Grid's block collection mutated mid-enumeration; retry on the next tick.
+                return;
+            }
+
+            if (isWheelGrid)
             {
                 _skip = true;
                 _isInitialized = true;

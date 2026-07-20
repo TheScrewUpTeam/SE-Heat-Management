@@ -63,7 +63,25 @@ namespace TSUT.HeatManagement
         // Called from HeatSession.UpdateBeforeSimulation, once, in place of UpdateOnceBeforeFrame.
         internal void TickInitialize()
         {
-            if (_grid == null || HeatSession.IsWheelGrid(_grid))
+            if (_grid == null)
+            {
+                _skip = true;
+                _isInitialized = true;
+                return;
+            }
+
+            bool isWheelGrid;
+            try
+            {
+                isWheelGrid = HeatSession.IsWheelGrid(_grid);
+            }
+            catch (InvalidOperationException)
+            {
+                // Grid's block collection mutated mid-enumeration; retry on the next tick.
+                return;
+            }
+
+            if (isWheelGrid)
             {
                 _skip = true;
                 _isInitialized = true;
@@ -239,7 +257,7 @@ namespace TSUT.HeatManagement
             }
 
             var slimBlocksForLogic = new List<IMySlimBlock>();
-            _grid.GetBlocks(slimBlocksForLogic);
+            HeatSession.GetBlocksSafe(_grid, slimBlocksForLogic);
             foreach (var slim in slimBlocksForLogic)
             {
                 var fatBlock = slim.FatBlock;
@@ -271,7 +289,7 @@ namespace TSUT.HeatManagement
         private void CollectPipeNetworks()
         {
             var slimBlocks = new List<IMySlimBlock>();
-            _grid.GetBlocks(slimBlocks);
+            HeatSession.GetBlocksSafe(_grid, slimBlocks);
 
             var pipeBlocks = slimBlocks
                 .Where(s => s.FatBlock != null && HeatPipeManagerFactory.IsPipeCandidate(s.FatBlock))
@@ -301,7 +319,7 @@ namespace TSUT.HeatManagement
 
             foreach (var neighbor in connectedNeighbors)
             {
-                foreach (var manager in _pipeNetworks)
+                foreach (var manager in _pipeNetworks.ToList())
                 {
                     var node = manager.TryGetNode(neighbor);
                     if (node == null) continue;

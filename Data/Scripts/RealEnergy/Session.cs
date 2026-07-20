@@ -3,6 +3,7 @@ using VRage.Game.Components;
 using VRage.Game.ModAPI;
 using VRage.ModAPI;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using VRage.Game;
 using VRage.Utils;
 using Sandbox.ModAPI.Interfaces.Terminal;
@@ -33,14 +34,14 @@ namespace TSUT.HeatManagement
         private static bool _initialized = false;
         public static int _tickCount = 0;
 
-        private static Dictionary<long, IHeatBehavior> _trackedNetworkBlocks = new Dictionary<long, IHeatBehavior>();
-        private static readonly Dictionary<long, GridHeatComponent> _gridComponentCache = new Dictionary<long, GridHeatComponent>();
+        private static ConcurrentDictionary<long, IHeatBehavior> _trackedNetworkBlocks = new ConcurrentDictionary<long, IHeatBehavior>();
+        private static readonly ConcurrentDictionary<long, GridHeatComponent> _gridComponentCache = new ConcurrentDictionary<long, GridHeatComponent>();
 
         // Fallback cache for when another mod clobbers Entity.GameLogic on a grid (e.g. via raw
         // Components.Add() instead of the composite-safe registration path), which makes
         // grid.GameLogic.GetAs<GridO2Manager>() permanently return null even though the component
         // is alive and ticking.
-        private static readonly Dictionary<long, GridO2Manager> _o2ManagerCache = new Dictionary<long, GridO2Manager>();
+        private static readonly ConcurrentDictionary<long, GridO2Manager> _o2ManagerCache = new ConcurrentDictionary<long, GridO2Manager>();
 
         public static void RegisterGridComponent(long entityId, GridHeatComponent component)
         {
@@ -49,7 +50,8 @@ namespace TSUT.HeatManagement
 
         public static void UnregisterGridComponent(long entityId)
         {
-            _gridComponentCache.Remove(entityId);
+            GridHeatComponent removed;
+            _gridComponentCache.TryRemove(entityId, out removed);
         }
 
         public static void RegisterO2Manager(long entityId, GridO2Manager component)
@@ -59,7 +61,8 @@ namespace TSUT.HeatManagement
 
         public static void UnregisterO2Manager(long entityId)
         {
-            _o2ManagerCache.Remove(entityId);
+            GridO2Manager removed;
+            _o2ManagerCache.TryRemove(entityId, out removed);
         }
 
         public static bool TryGetO2Manager(IMyCubeGrid grid, out GridO2Manager manager)
@@ -426,10 +429,33 @@ namespace TSUT.HeatManagement
             }
         }
 
+        // grid.GetBlocks enumerates the grid's internal block collection directly. If the grid is
+        // being mutated at the same time (e.g. a large blueprint paste still adding blocks), the
+        // enumerator throws InvalidOperationException. Retry a few times since the mutation window
+        // is transient; if it never settles, let the exception propagate so the caller can skip
+        // this tick and retry later, rather than treating it as "not a wheel grid".
+        public static void GetBlocksSafe(IMyCubeGrid grid, List<IMySlimBlock> blocks, int maxAttempts = 5)
+        {
+            for (int attempt = 0; ; attempt++)
+            {
+                blocks.Clear();
+                try
+                {
+                    grid.GetBlocks(blocks);
+                    return;
+                }
+                catch (InvalidOperationException)
+                {
+                    if (attempt >= maxAttempts - 1)
+                        throw;
+                }
+            }
+        }
+
         public static bool IsWheelGrid(IMyCubeGrid grid)
         {
             var slimBlocks = new List<IMySlimBlock>();
-            grid.GetBlocks(slimBlocks);
+            GetBlocksSafe(grid, slimBlocks);
 
             // wheel grids have exactly one block and it's a wheel part
             return slimBlocks.Count == 1 && slimBlocks[0].FatBlock is IMyWheel;
