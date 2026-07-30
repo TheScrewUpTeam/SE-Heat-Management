@@ -175,6 +175,11 @@ namespace TSUT.HeatManagement
             EventController.SetDetailedInfoDirty();
         }
 
+        public void RefreshDetailedInfo()
+        {
+            UpdateDetailedInfo(EventController.EntityId);
+        }
+
         public void LoadThreshold()
         {
             string val;

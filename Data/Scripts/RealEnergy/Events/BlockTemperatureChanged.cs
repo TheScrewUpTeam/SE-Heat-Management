@@ -254,6 +254,11 @@ namespace TSUT.HeatManagement
             HeatSession.networking?.SendToServer(message);
         }
 
+        public void RefreshDetailedInfo()
+        {
+            UpdateDetailedInfo(EventController.EntityId);
+        }
+
         public void LoadThreshold()
         {
             string val;
