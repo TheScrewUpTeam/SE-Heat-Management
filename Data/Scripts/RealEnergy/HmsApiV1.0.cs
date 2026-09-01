@@ -16,7 +16,7 @@ namespace TSUT.HeatManagement
 {
     public class HmsApi
     {
-        public string ApiVersion = "1.0.3";
+        public string ApiVersion = "1.0.4";
         public static long HeatApiMessageId = 35136709491; // Unique message ID for heat API
         public static long HeatProviderMesageId = 35136709492; // Unique message ID for heat provider
         public static long HeatApiRequestMessageId = 35136709493; // Unique message ID to request a resend of the heat API
@@ -682,9 +682,14 @@ namespace TSUT.HeatManagement
             {
                 var cfg = _sharedApi?.Utils?.GetHmsConfig();
                 if (cfg == null || !cfg.LIMIT_TO_PLAYER_GRIDS) return true;
-                var blocks = new List<IMyTerminalBlock>();
-                MyAPIGateway.TerminalActionsHelper.GetTerminalSystemForGrid(Block.CubeGrid)?.GetBlocks(blocks);
-                return blocks.Exists(b => b.OwnerId != 0 && MyAPIGateway.Players.TryGetIdentityId(b.OwnerId) != null);
+                var cubeGrid = Block.CubeGrid as MyCubeGrid;
+                if (cubeGrid == null) return false;
+                foreach (var ownerId in cubeGrid.BigOwners)
+                {
+                    if (MyAPIGateway.Players.TryGetIdentityId(ownerId) != null)
+                        return true;
+                }
+                return false;
             }
 
             /// <summary>

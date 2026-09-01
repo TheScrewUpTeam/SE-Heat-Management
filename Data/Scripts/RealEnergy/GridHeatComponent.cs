@@ -173,12 +173,11 @@ namespace TSUT.HeatManagement
         private bool IsPlayerGrid()
         {
             if (_grid == null) return false;
-            var terminalBlocks = new List<IMyTerminalBlock>();
-            MyAPIGateway.TerminalActionsHelper.GetTerminalSystemForGrid(_grid)?.GetBlocks(terminalBlocks);
-            foreach (var block in terminalBlocks)
+            var cubeGrid = _grid as MyCubeGrid;
+            if (cubeGrid == null) return false;
+            foreach (var ownerId in cubeGrid.BigOwners)
             {
-                if (block.OwnerId == 0) continue;
-                if (MyAPIGateway.Players.TryGetIdentityId(block.OwnerId) != null)
+                if (MyAPIGateway.Players.TryGetIdentityId(ownerId) != null)
                     return true;
             }
             return false;

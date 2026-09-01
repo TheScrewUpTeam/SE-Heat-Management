@@ -119,10 +119,32 @@ namespace TSUT.HeatManagement
             }
             if (call.TryGetValue("blockId", out method) && method is long)
             {
+                var blockId = (long)method;
+                object unregisterObj;
+                if (call.TryGetValue("unregister", out unregisterObj) && unregisterObj is bool && (bool)unregisterObj)
+                {
+                    IDictionary<string, object> existing;
+                    if (_heatApi.Registry.GetDirectBlockBehaviors().TryGetValue(blockId, out existing) && existing != null)
+                    {
+                        object cleanup;
+                        if (existing.TryGetValue("Cleanup", out cleanup) && cleanup is Action)
+                        {
+                            try { (cleanup as Action)(); }
+                            catch (Exception ex) { HeatLog.Warn($"Direct block behavior cleanup on unregister: {ex}", LS.Behavior); }
+                        }
+                    }
+                    _heatApi.Registry.UnregisterDirectBlockBehavior(blockId);
+
+                    var unregBlock = MyAPIGateway.Entities.GetEntityById(blockId) as IMyCubeBlock;
+                    GridHeatComponent unregGridComp;
+                    if (unregBlock?.CubeGrid != null && _gridComponentCache.TryGetValue(unregBlock.CubeGrid.EntityId, out unregGridComp))
+                        unregGridComp.UnregisterBehavior(unregBlock);
+                    return;
+                }
+
                 object behaviorObj;
                 if (call.TryGetValue("behavior", out behaviorObj) && behaviorObj is IDictionary<string, object>)
                 {
-                    var blockId = (long)method;
                     var behavior = (IDictionary<string, object>)behaviorObj;
                     _heatApi.Registry.RegisterDirectBlockBehavior(blockId, behavior);
 

@@ -74,6 +74,11 @@ namespace TSUT.HeatManagement
             _directBlockBehaviors[blockId] = behavior;
         }
 
+        public void UnregisterDirectBlockBehavior(long blockId)
+        {
+            _directBlockBehaviors.Remove(blockId);
+        }
+
         public IDictionary<long, IDictionary<string, object>> GetDirectBlockBehaviors()
         {
             return _directBlockBehaviors;
