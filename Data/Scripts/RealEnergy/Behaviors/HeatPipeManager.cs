@@ -171,6 +171,9 @@ namespace TSUT.HeatManagement
 
         private static Base6Directions.Direction[] GetPipeDirections(IMyCubeBlock block)
         {
+            if (block?.BlockDefinition == null)
+                return new Base6Directions.Direction[0]; // block not fully initialized yet (e.g. mid blueprint-paste)
+
             Base6Directions.Direction[] dirs;
             // 1. Try dictionary (heat-only pipes, etc.)
             if (PipeConnectionMap.TryGetValue(block.BlockDefinition.SubtypeName, out dirs))
@@ -207,6 +210,9 @@ namespace TSUT.HeatManagement
 
         internal static bool IsPipeCandidate(IMyCubeBlock block)
         {
+            if (block?.BlockDefinition == null)
+                return false; // block not fully initialized yet (e.g. mid blueprint-paste) — don't cache
+
             var defId = block.BlockDefinition;
 
             bool cached;

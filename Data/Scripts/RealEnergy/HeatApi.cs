@@ -99,6 +99,7 @@ namespace TSUT.HeatManagement
         bool HasEnoughO2(float amount, float deltaTime, IMyCubeBlock block);
         IMyTerminalControlProperty<float> CreateProperty<TBlock>() where TBlock: IMyTerminalBlock;
         void TryRegister<T>() where T : IMyTerminalBlock;
+        bool IsConfigSynced();
     }
 
     public interface IHeatEffects

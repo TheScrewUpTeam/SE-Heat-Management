@@ -72,6 +72,21 @@ public class MyCustomBlockHeat : HmsApi.AHmsBlockComponent
 
 That's all. No `HmsApi` constructor call needed — the component initializes HMS automatically and handles late-joining blocks (placed after world load) correctly.
 
+### Excluding Blocks (`ShouldAttach`)
+
+`[MyEntityComponentDescriptor]` attaches to every block of the given TypeId, including modded blocks built on the same vanilla type (e.g. Industrial Overhaul blocks on `MyObjectBuilder_OxygenGenerator`). Override `ShouldAttach()` to opt a block out of HMS entirely — no `OnHmsInit`, no registration, no updates, no `OnDetachedFromHeatSystem`:
+
+```csharp
+protected override bool ShouldAttach()
+{
+    var def = MyDefinitionManager.Static.GetCubeBlockDefinition(Block.BlockDefinition) as MyOxygenGeneratorDefinition;
+    return def?.ProducedGases != null
+        && def.ProducedGases.TrueForAll(g => g.Id.SubtypeName == "Oxygen" || g.Id.SubtypeName == "Hydrogen");
+}
+```
+
+`ShouldAttach()` is called from `base.Init`; `Entity` and its block definition are available. If you override `Init` and subscribe events after `base.Init`, check `IsAttached` first. Returning early from `Init` without calling `base.Init` also excludes the block.
+
 If you also need the API in a session component (e.g. for `Utils` queries outside of block logic), access the shared instance:
 
 ```csharp

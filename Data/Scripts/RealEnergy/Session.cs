@@ -34,6 +34,10 @@ namespace TSUT.HeatManagement
         private static bool _initialized = false;
         public static int _tickCount = 0;
 
+        private static bool _configSynced = false;
+        private static readonly List<Action> _configChangedCallbacks = new List<Action>();
+        public static bool IsConfigSynced => MyAPIGateway.Multiplayer.IsServer || _configSynced;
+
         private static ConcurrentDictionary<long, IHeatBehavior> _trackedNetworkBlocks = new ConcurrentDictionary<long, IHeatBehavior>();
         private static readonly ConcurrentDictionary<long, GridHeatComponent> _gridComponentCache = new ConcurrentDictionary<long, GridHeatComponent>();
 
@@ -116,6 +120,10 @@ namespace TSUT.HeatManagement
             {
                 var mapper = (Func<long, IDictionary<string, object>>)method;
                 _heatApi.Registry.RegisterHeatMapper(mapper);
+            }
+            if (call.TryGetValue("onConfigChanged", out method) && method is Action)
+            {
+                _configChangedCallbacks.Add((Action)method);
             }
             if (call.TryGetValue("blockId", out method) && method is long)
             {
@@ -621,7 +629,8 @@ namespace TSUT.HeatManagement
                             { "HEAT_SYSTEM_AUTO_UPDATE", Config.Instance.HEAT_SYSTEM_AUTO_UPDATE }
                         }
                     )
-                }
+                },
+                { "IsConfigSynced", new Func<bool>(() => IsConfigSynced) }
             };
         }
 
@@ -664,6 +673,13 @@ namespace TSUT.HeatManagement
             Config.Instance.HEAT_GLOW_INDICATION = heatConfigResponse.HEAT_GLOW_INDICATION;
             Config.Instance.HEAT_SYSTEM_VERSION = heatConfigResponse.HEAT_SYSTEM_VERSION;
             Config.Instance.HEAT_SYSTEM_AUTO_UPDATE = heatConfigResponse.HEAT_SYSTEM_AUTO_UPDATE;
+
+            _configSynced = true;
+            foreach (var callback in _configChangedCallbacks)
+            {
+                try { callback(); }
+                catch (Exception ex) { HeatLog.Warn($"onConfigChanged callback threw: {ex}", LS.Grid); }
+            }
         }
     }
 }

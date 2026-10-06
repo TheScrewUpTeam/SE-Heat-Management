@@ -36,7 +36,12 @@ namespace TSUT.HeatManagement
         {
             int flags = Config.Instance?.LOG_FLAGS ?? 0;
             bool flagMatch = (flags & sub) != 0;
-            bool gridMatch = grid != null && grid.CustomName.Contains(Config.HeatDebugString);
+            bool gridMatch = false;
+            if (grid != null)
+            {
+                try { gridMatch = grid.CustomName != null && grid.CustomName.Contains(Config.HeatDebugString); }
+                catch { gridMatch = false; } // grid not fully attached yet (early boot race)
+            }
             return flagMatch || gridMatch;
         }
 

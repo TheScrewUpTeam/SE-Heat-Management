@@ -59,6 +59,11 @@ namespace TSUT.HeatManagement
             _cacheSurfaceArea.Clear();
         }
 
+        public bool IsConfigSynced()
+        {
+            return HeatSession.IsConfigSynced;
+        }
+
         public float GetHeat(IMyCubeBlock block)
         {
             if (block.Storage == null)

@@ -172,15 +172,40 @@ namespace TSUT.HeatManagement
 
         private bool IsPlayerGrid()
         {
-            if (_grid == null) return false;
+            if (_grid == null || MyAPIGateway.Players == null) return false;
             var cubeGrid = _grid as MyCubeGrid;
-            if (cubeGrid == null) return false;
-            foreach (var ownerId in cubeGrid.BigOwners)
+            if (cubeGrid?.BigOwners != null)
             {
-                if (MyAPIGateway.Players.TryGetIdentityId(ownerId) != null)
+                foreach (var ownerId in cubeGrid.BigOwners)
+                {
+                    if (OwnerIsHumanPlayer(ownerId))
+                        return true;
+                }
+            }
+
+            var slimBlocks = new List<IMySlimBlock>();
+            HeatSession.GetBlocksSafe(_grid, slimBlocks);
+            foreach (var slim in slimBlocks)
+            {
+                var fat = slim.FatBlock;
+                if (fat == null || fat.OwnerId == 0) continue;
+                if (OwnerIsHumanPlayer(fat.OwnerId))
                     return true;
             }
             return false;
+        }
+
+        // TryGetIdentityId alone isn't enough: bot/NPC identities have a backing IMyPlayer too.
+        private static bool OwnerIsHumanPlayer(long identityId)
+        {
+            if (identityId == 0) return false;
+            var online = MyAPIGateway.Players.TryGetIdentityId(identityId);
+            if (online != null) return !online.IsBot;
+
+            var faction = MyAPIGateway.Session?.Factions?.TryGetPlayerFaction(identityId);
+            if (faction != null && faction.IsEveryoneNpc()) return false;
+
+            return MyAPIGateway.Players.TryGetSteamId(identityId) != 0;
         }
 
         private void Activate()
